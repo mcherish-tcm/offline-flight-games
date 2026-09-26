@@ -11,6 +11,20 @@
       '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="17" cy="18" r="8"/><path d="M17 4v4M17 28v4M3 18h4M27 18h4M7 8l3 3M27 8l-3 3M7 28l3-3M27 28l-3-3"/><circle class="fg-accent" cx="14" cy="15" r="2"/></svg>',
     solitaire:
       '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="7" width="15" height="22" rx="2.5" transform="rotate(-10 11 18)"/><rect x="14" y="5" width="15" height="22" rx="2.5"/><path class="fg-accent" d="M21.5 12.5c-1.6-2-4.2-.6-3.4 1.5.6 1.4 3.4 3.5 3.4 3.5s2.8-2.1 3.4-3.5c.8-2.1-1.8-3.5-3.4-1.5z"/></svg>',
+    freecell:
+      '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="3" width="8" height="10" rx="1.5"/><rect class="fg-accent" x="13" y="3" width="8" height="10" rx="1.5"/><rect x="23" y="3" width="8" height="10" rx="1.5" stroke-dasharray="2 2"/><rect x="6" y="17" width="12" height="14" rx="2"/><rect x="16" y="20" width="12" height="11" rx="2"/></svg>',
+    spider:
+      '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 13l-6-4-2 4M11 17H3M11 21l-6 4-1 4M23 13l6-4 2 4M23 17h8M23 21l6 4 1 4"/><ellipse cx="17" cy="19" rx="6" ry="8"/><circle class="fg-accent" cx="17" cy="9" r="3.4"/></svg>',
+    blocks:
+      '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="4" width="8" height="8" rx="1.5"/><rect x="13" y="4" width="8" height="8" rx="1.5"/><rect x="4" y="13" width="8" height="8" rx="1.5"/><rect class="fg-accent" x="4" y="22" width="8" height="8" rx="1.5"/><rect class="fg-accent" x="13" y="22" width="8" height="8" rx="1.5"/><rect class="fg-accent" x="22" y="22" width="8" height="8" rx="1.5"/><rect x="22" y="13" width="8" height="8" rx="1.5" stroke-dasharray="2 2"/></svg>',
+    watersort:
+      '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M4 4v21a3.5 3.5 0 0 0 7 0V4M13.5 4v21a3.5 3.5 0 0 0 7 0V4M23 4v21a3.5 3.5 0 0 0 7 0V4"/><path class="fg-accent" d="M5.5 17h4v8a2 2 0 0 1-4 0z" stroke-width="0"/><path class="fg-accent" d="M15 21h4v4a2 2 0 0 1-4 0z" stroke-width="0"/><path d="M24.5 13h4" stroke-width="1.4"/></svg>',
+    memory:
+      '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="5" width="12" height="16" rx="2.5"/><rect x="19" y="13" width="12" height="16" rx="2.5"/><path class="fg-accent" d="M9 10.5c-.9-1.2-2.8-.4-2.3 1 .4 1 2.3 2.4 2.3 2.4s1.9-1.4 2.3-2.4c.5-1.4-1.4-2.2-2.3-1z"/><path class="fg-accent" d="M25 18.5c-.9-1.2-2.8-.4-2.3 1 .4 1 2.3 2.4 2.3 2.4s1.9-1.4 2.3-2.4c.5-1.4-1.4-2.2-2.3-1z"/></svg>',
+    dice:
+      '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="9" width="16" height="16" rx="3.5" transform="rotate(-10 11 17)"/><rect x="16" y="6" width="15" height="15" rx="3.5"/><g fill="currentColor" stroke-width="0"><circle cx="20" cy="10" r="1.5"/><circle cx="27" cy="17" r="1.5"/><circle cx="7.5" cy="13.8" r="1.5"/><circle cx="14.2" cy="20.2" r="1.5"/></g><circle class="fg-accent" cx="23.5" cy="13.5" r="1.7" stroke-width="0"/><circle class="fg-accent" cx="10.8" cy="17" r="1.7" stroke-width="0"/></svg>',
+    nonogram:
+      '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2"><rect x="10" y="10" width="21" height="21" rx="2"/><path d="M17 10v21M24 10v21M10 17h21M10 24h21" stroke-width="1.2"/><path class="fg-accent" d="M10 10h7v7h-7zM17 17h7v7h-7zM24 10h7v7h-7z" stroke-width="0"/><path d="M3 13.5h4M3 20.5h4M3 27.5h4M13.5 3v4M20.5 3v4M27.5 3v4" stroke-width="1.6" stroke-linecap="round"/></svg>',
     snake:
       '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 27h10V17h12V7h-8"/><circle class="fg-accent" cx="12" cy="8" r="2.4" stroke-width="0"/></svg>',
     ox:
@@ -21,6 +35,8 @@
       '<svg viewBox="0 0 34 34" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect class="fg-accent" x="10" y="10" width="4" height="4" rx="1" stroke-width="0"/><path d="M7 7h10v10H7zM17 17h10" fill="none"/><circle cx="7" cy="7" r="2" stroke-width="0"/><circle cx="17" cy="7" r="2" stroke-width="0"/><circle cx="27" cy="7" r="2" stroke-width="0"/><circle cx="7" cy="17" r="2" stroke-width="0"/><circle cx="17" cy="17" r="2" stroke-width="0"/><circle cx="27" cy="17" r="2" stroke-width="0"/><circle cx="7" cy="27" r="2" stroke-width="0"/><circle cx="17" cy="27" r="2" stroke-width="0"/><circle cx="27" cy="27" r="2" stroke-width="0"/></svg>',
     makhos:
       '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="26" height="26" rx="3"/><path d="M17 4v26M4 17h26" stroke-width="1.4"/><circle class="fg-accent" cx="10.5" cy="23.5" r="3.6"/><circle cx="23.5" cy="10.5" r="3.6"/></svg>',
+    makkhum:
+      '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="8" width="30" height="18" rx="9"/><circle cx="11" cy="13.5" r="2.2"/><circle cx="17" cy="13.5" r="2.2"/><circle cx="23" cy="13.5" r="2.2"/><circle cx="11" cy="20.5" r="2.2"/><circle class="fg-accent" cx="17" cy="20.5" r="2.2"/><circle cx="23" cy="20.5" r="2.2"/></svg>',
     othello:
       '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="28" height="28" rx="3"/><circle cx="12.5" cy="12.5" r="4"/><circle class="fg-accent" cx="21.5" cy="12.5" r="4"/><circle class="fg-accent" cx="12.5" cy="21.5" r="4"/><circle cx="21.5" cy="21.5" r="4"/></svg>',
     gomoku:

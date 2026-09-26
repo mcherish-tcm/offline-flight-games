@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f1622" />
+    <title>ภาพปริศนาเติมช่อง · เกมบนเครื่องบิน</title>
+    <link rel="manifest" href="../../manifest.webmanifest" />
+    <link rel="icon" href="../../icons/icon.svg" type="image/svg+xml" />
+    <script>
+      try {
+        if (localStorage.getItem('ffg:theme') === '"light"') document.documentElement.setAttribute('data-theme', 'light');
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="../../shared/tokens.css" />
+    <link rel="stylesheet" href="../../shared/base.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="../../shared/games.js" defer></script>
+    <script src="../../shared/app.js" data-root="../../" defer></script>
+    <script src="solver.js" defer></script>
+    <script src="puzzles.js" defer></script>
+    <script src="game.js" defer></script>
+  </head>
+  <body class="game">
+    <header class="bar">
+      <a class="bar__back" href="../../" data-icon="back">หน้าแรก</a>
+      <h1 class="bar__title">ภาพปริศนาเติมช่อง</h1>
+      <div class="bar__actions">
+        <button type="button" class="icon-btn" data-howto="nonogram" data-icon="info" aria-label="วิธีเล่น"></button>
+        <button type="button" class="icon-btn" id="undo" data-icon="undo" aria-label="ย้อน" hidden disabled></button>
+        <button type="button" class="icon-btn" id="list" data-icon="grid" aria-label="เลือกภาพ" hidden></button>
+        <button type="button" class="icon-btn" id="clear" data-icon="restart" aria-label="ล้างภาพนี้เริ่มใหม่" hidden></button>
+      </div>
+    </header>
+    <main class="stage ng">
+      <section class="ng-picker" id="picker" aria-label="เลือกภาพ"></section>
+      <section class="ng-play" id="play" hidden>
+        <div class="ng-top">
+          <span id="pname"></span>
+          <span class="num" id="ptime">0:00</span>
+        </div>
+        <div class="ng-wrap" id="wrap">
+          <div class="ng-grid" id="grid">
+            <div class="ng-corner" id="corner" aria-hidden="true"></div>
+            <div class="ng-cclues" id="cclues" aria-label="ตัวเลขใบ้แนวตั้ง"></div>
+            <div class="ng-rclues" id="rclues" aria-label="ตัวเลขใบ้แนวนอน"></div>
+            <div class="ng-board" id="board" role="grid" aria-label="ตาราง แตะหรือลากเพื่อถมช่อง"></div>
+          </div>
+        </div>
+        <div class="ng-tools">
+          <div class="seg ng-mode" id="mode" role="radiogroup" aria-label="โหมดการแตะ">
+            <button type="button" role="radio" aria-checked="true" data-mode="1" data-icon="square">ถมช่อง</button>
+            <button type="button" role="radio" aria-checked="false" data-mode="2" data-icon="cross">กากบาท</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

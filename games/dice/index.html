@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f1622" />
+    <title>ไฟว์ไดซ์ · เกมบนเครื่องบิน</title>
+    <link rel="manifest" href="../../manifest.webmanifest" />
+    <link rel="icon" href="../../icons/icon.svg" type="image/svg+xml" />
+    <script>
+      try {
+        if (localStorage.getItem('ffg:theme') === '"light"') document.documentElement.setAttribute('data-theme', 'light');
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="../../shared/tokens.css" />
+    <link rel="stylesheet" href="../../shared/base.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="../../shared/games.js" defer></script>
+    <script src="../../shared/app.js" data-root="../../" defer></script>
+    <script src="engine.js" defer></script>
+    <script src="game.js" defer></script>
+  </head>
+  <body class="game">
+    <header class="bar">
+      <a class="bar__back" href="../../" data-icon="back">หน้าแรก</a>
+      <h1 class="bar__title">ไฟว์ไดซ์</h1>
+      <div class="bar__actions">
+        <button type="button" class="icon-btn" data-howto="dice" data-icon="info" aria-label="วิธีเล่น"></button>
+        <button type="button" class="icon-btn" id="new" data-icon="restart" aria-label="เกมใหม่ · เลือกคนเดียว / 2 คน"></button>
+      </div>
+    </header>
+    <main class="stage dc">
+      <div class="dc-status" id="status" aria-live="polite"></div>
+      <div class="dc-dice" id="dice" aria-label="ลูกเต๋า 5 ลูก แตะลูกเพื่อเก็บไว้ไม่ทอยใหม่"></div>
+      <button type="button" class="btn btn--primary dc-roll" id="roll">ทอย</button>
+      <div class="dc-sheet" id="card" role="table" aria-label="ตารางแต้ม แตะช่องเพื่อลงแต้ม"></div>
+    </main>
+  </body>
+</html>

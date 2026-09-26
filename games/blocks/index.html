@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f1622" />
+    <title>บล็อกเติมแถว · เกมบนเครื่องบิน</title>
+    <link rel="manifest" href="../../manifest.webmanifest" />
+    <link rel="icon" href="../../icons/icon.svg" type="image/svg+xml" />
+    <script>
+      try {
+        if (localStorage.getItem('ffg:theme') === '"light"') document.documentElement.setAttribute('data-theme', 'light');
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="../../shared/tokens.css" />
+    <link rel="stylesheet" href="../../shared/base.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="../../shared/games.js" defer></script>
+    <script src="../../shared/app.js" data-root="../../" defer></script>
+    <script src="engine.js" defer></script>
+    <script src="game.js" defer></script>
+  </head>
+  <body class="game">
+    <header class="bar">
+      <a class="bar__back" href="../../" data-icon="back">หน้าแรก</a>
+      <h1 class="bar__title">บล็อกเติมแถว</h1>
+      <div class="bar__actions">
+        <button type="button" class="icon-btn" data-howto="blocks" data-icon="info" aria-label="วิธีเล่น"></button>
+        <button type="button" class="icon-btn" id="new" data-icon="restart" aria-label="เริ่มเกมใหม่"></button>
+      </div>
+    </header>
+    <main class="stage blk">
+      <div class="blk-top">
+        <div class="blk-stat"><span class="blk-stat__label">คะแนน</span><b class="num blk-stat__value" id="score">0</b></div>
+        <div class="blk-stat blk-stat--best"><span class="blk-stat__label">สูงสุด</span><b class="num blk-stat__value" id="best">0</b></div>
+      </div>
+      <div class="blk-wrap" id="wrap">
+        <div class="blk-board" id="board" role="grid" aria-label="กระดาน 8 คูณ 8"></div>
+      </div>
+      <div class="blk-tray" id="tray" aria-label="ชิ้นที่ต้องวาง ลากขึ้นไปวางบนกระดาน"></div>
+    </main>
+  </body>
+</html>

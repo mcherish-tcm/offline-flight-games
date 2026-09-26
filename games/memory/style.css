@@ -1,0 +1,137 @@
+/* Hallmark · extends App Shell (night cabin) · จับคู่ไพ่ความจำ — ไพ่พลิก 3 มิติ ภาพวาดด้วย SVG · tokens only (สีภาพ = --color-g*) */
+
+.mm-solo {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 var(--space-xs);
+  color: var(--color-ink-2);
+}
+
+.mm-solo b {
+  color: var(--color-ink);
+  font-size: var(--text-lg);
+}
+
+.mm-solo > :last-child {
+  justify-self: end;
+}
+
+.mm-best {
+  font-size: var(--text-sm);
+  color: var(--color-accent-text);
+}
+
+.mm-board {
+  --cols: 4;
+  --rows: 4;
+  --gap: clamp(4px, 1.6cqw, 10px);
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--rows), minmax(0, 1fr));
+  gap: var(--gap);
+  width: min(100cqw, calc(100cqh * var(--cols) * 0.76 / var(--rows)), 34rem);
+  aspect-ratio: calc(var(--cols) * 0.76) / var(--rows);
+  perspective: 900px;
+}
+
+.mm-card {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+}
+
+.mm-inner {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+
+.mm-card.is-open .mm-inner,
+.mm-card.is-done .mm-inner {
+  transform: rotateY(180deg);
+}
+
+.mm-back,
+.mm-face {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.mm-back {
+  background: repeating-linear-gradient(45deg, var(--color-card-back) 0 5px, var(--color-card-back-2) 5px 10px);
+  border: 3px solid var(--color-paper-3);
+}
+
+.mm-face {
+  transform: rotateY(180deg);
+  background: var(--color-card-face);
+  box-shadow: 0 0 0 1px var(--color-card-edge);
+  color: var(--sym);
+}
+
+.mm-face svg {
+  width: 64%;
+  height: 64%;
+}
+
+.mm-card.is-done .mm-face {
+  box-shadow: 0 0 0 2px var(--color-ok);
+}
+
+.mm-card.is-done[data-by="0"] .mm-face {
+  box-shadow: 0 0 0 3px var(--color-p1);
+}
+
+.mm-card.is-done[data-by="1"] .mm-face {
+  box-shadow: 0 0 0 3px var(--color-p2);
+}
+
+/* จางลงที่หน้าไพ่ (ห้ามใส่ opacity ที่ .mm-inner — จะทำให้การพลิก 3 มิติแบนและเห็นหลังไพ่แทน) */
+.mm-card.is-done .mm-face svg {
+  opacity: 0.5;
+  transition: opacity var(--dur-slow) var(--ease-out) 400ms;
+}
+
+.mm-card.is-miss .mm-face {
+  box-shadow: 0 0 0 2px var(--color-danger);
+}
+
+[data-c="0"] { --sym: var(--color-g0); }
+[data-c="1"] { --sym: var(--color-g1); }
+[data-c="2"] { --sym: var(--color-g2); }
+[data-c="3"] { --sym: var(--color-g3); }
+[data-c="4"] { --sym: var(--color-g4); }
+[data-c="5"] { --sym: var(--color-g5); }
+[data-c="6"] { --sym: var(--color-g6); }
+[data-c="7"] { --sym: var(--color-g7); }
+[data-c="8"] { --sym: var(--color-g8); }
+[data-c="9"] { --sym: var(--color-g9); }
+[data-c="10"] { --sym: var(--color-g10); }
+[data-c="11"] { --sym: var(--color-card-ink); }
+
+/* สีเหลือง/ขาวบนหน้าไพ่สีนวลเห็นยาก → เติมเส้นขอบเข้ม */
+.mm-face svg {
+  stroke: var(--color-card-ink);
+  stroke-opacity: 0.35;
+  stroke-width: 0.6;
+  paint-order: stroke;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-inner {
+    transition-duration: 1ms;
+  }
+}

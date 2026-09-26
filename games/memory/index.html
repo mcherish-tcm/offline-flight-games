@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f1622" />
+    <title>จับคู่ไพ่ความจำ · เกมบนเครื่องบิน</title>
+    <link rel="manifest" href="../../manifest.webmanifest" />
+    <link rel="icon" href="../../icons/icon.svg" type="image/svg+xml" />
+    <script>
+      try {
+        if (localStorage.getItem('ffg:theme') === '"light"') document.documentElement.setAttribute('data-theme', 'light');
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="../../shared/tokens.css" />
+    <link rel="stylesheet" href="../../shared/base.css" />
+    <link rel="stylesheet" href="../../shared/duo.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="../../shared/games.js" defer></script>
+    <script src="../../shared/app.js" data-root="../../" defer></script>
+    <script src="../../shared/duo.js" defer></script>
+    <script src="engine.js" defer></script>
+    <script src="game.js" defer></script>
+  </head>
+  <body class="game">
+    <header class="bar">
+      <a class="bar__back" href="../../" data-icon="back">หน้าแรก</a>
+      <h1 class="bar__title">จับคู่ไพ่ความจำ</h1>
+      <div class="bar__actions">
+        <button type="button" class="icon-btn" data-howto="memory" data-icon="info" aria-label="วิธีเล่น"></button>
+        <button type="button" class="icon-btn" id="settings" data-icon="sliders" aria-label="ตั้งค่าป้ายผู้เล่น · ล้างสกอร์"></button>
+        <button type="button" class="icon-btn" id="restart" data-icon="restart" aria-label="เกมใหม่ · เลือกโหมดและขนาด"></button>
+      </div>
+    </header>
+    <main class="stage duo mm" id="stage">
+      <div class="mm-solo" id="solo" hidden>
+        <span>เปิด <b class="num" id="moves">0</b> ครั้ง</span>
+        <span class="mm-best" id="best"></span>
+        <b class="num" id="time">0:00</b>
+      </div>
+      <div class="duo-board-wrap" id="wrap">
+        <div class="mm-board" id="board" aria-label="ไพ่คว่ำ แตะเพื่อเปิดทีละ 2 ใบ"></div>
+      </div>
+    </main>
+  </body>
+</html>

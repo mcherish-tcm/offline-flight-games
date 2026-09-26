@@ -50,6 +50,21 @@
   --color-p2-wash: oklch(77% 0.12 232 / 0.16);
   --color-p2-ink: oklch(20% 0.05 240);
 
+  /* game palette — 12 สีแยกกันชัด (บล็อกเติมแถว · เทน้ำเรียงสี · จับคู่ไพ่) */
+  --color-g0: oklch(63% 0.2 27);
+  --color-g1: oklch(74% 0.16 58);
+  --color-g2: oklch(89% 0.16 98);
+  --color-g3: oklch(80% 0.19 135);
+  --color-g4: oklch(60% 0.14 152);
+  --color-g5: oklch(74% 0.11 192);
+  --color-g6: oklch(78% 0.11 238);
+  --color-g7: oklch(54% 0.19 266);
+  --color-g8: oklch(62% 0.2 308);
+  --color-g9: oklch(79% 0.13 352);
+  --color-g10: oklch(52% 0.08 55);
+  --color-g11: oklch(93% 0.01 250);
+  --color-g-ink: oklch(20% 0.02 255);
+
   /* type — system fonts that render Thai well, no downloads */
   --font-body: "Noto Sans Thai UI", "Noto Sans Thai", "Leelawadee UI", "Sarabun", "Thonburi", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-display: var(--font-body);
@@ -121,6 +136,8 @@
   --color-p2-deep: oklch(46% 0.13 250);
   --color-p2-wash: oklch(56% 0.14 245 / 0.13);
   --color-p2-ink: oklch(98% 0.01 245);
+  --color-g2: oklch(84% 0.17 95);
+  --color-g11: oklch(45% 0.02 255);
 }
 
 @media (prefers-reduced-motion: reduce) {

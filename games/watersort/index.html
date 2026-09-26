@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f1622" />
+    <title>เทน้ำเรียงสี · เกมบนเครื่องบิน</title>
+    <link rel="manifest" href="../../manifest.webmanifest" />
+    <link rel="icon" href="../../icons/icon.svg" type="image/svg+xml" />
+    <script>
+      try {
+        if (localStorage.getItem('ffg:theme') === '"light"') document.documentElement.setAttribute('data-theme', 'light');
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="../../shared/tokens.css" />
+    <link rel="stylesheet" href="../../shared/base.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="../../shared/games.js" defer></script>
+    <script src="../../shared/app.js" data-root="../../" defer></script>
+    <script src="engine.js" defer></script>
+    <script src="game.js" defer></script>
+  </head>
+  <body class="game">
+    <header class="bar">
+      <a class="bar__back" href="../../" data-icon="back">หน้าแรก</a>
+      <h1 class="bar__title">เทน้ำเรียงสี</h1>
+      <div class="bar__actions">
+        <button type="button" class="icon-btn" data-howto="watersort" data-icon="info" aria-label="วิธีเล่น"></button>
+        <button type="button" class="icon-btn" id="undo" data-icon="undo" aria-label="ย้อน" disabled></button>
+        <button type="button" class="icon-btn" id="new" data-icon="restart" aria-label="เริ่มด่านนี้ใหม่ / เลือกด่าน"></button>
+      </div>
+    </header>
+    <main class="stage ws">
+      <div class="ws-top">
+        <span class="ws-level">ด่าน <b class="num" id="level">1</b></span>
+        <span class="ws-moves">เท <b class="num" id="moves">0</b> ครั้ง</span>
+      </div>
+      <div class="ws-wrap" id="wrap">
+        <div class="ws-rack" id="rack" aria-label="หลอดน้ำ แตะหลอดที่จะเท แล้วแตะหลอดปลายทาง"></div>
+      </div>
+      <div class="ws-tools">
+        <button type="button" class="btn" id="hint" data-icon="wand">ใบ้ 1 ตา</button>
+      </div>
+    </main>
+  </body>
+</html>

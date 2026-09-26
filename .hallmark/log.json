@@ -5,6 +5,15 @@
     "theme": "custom",
     "theme_axes": "dark / rounded-system-sans / warm",
     "vibe": "night cabin, reading light, calm, tactile",
+    "enrichment": "none (code-drawn SVG/CSS cards, dice, tubes, seeds, symbols)",
+    "brief": "v4 · FreeCell, Spider, block puzzle, water sort, memory match, five dice, nonogram, Thai mancala (makkhum); shared 12-colour game palette + shared card module"
+  },
+  {
+    "date": "2026-09-26",
+    "macrostructure": "App Shell (extension — no new macrostructure)",
+    "theme": "custom",
+    "theme_axes": "dark / rounded-system-sans / warm",
+    "vibe": "night cabin, reading light, calm, tactile",
     "enrichment": "none (code-drawn SVG/CSS boards and glyphs)",
     "brief": "v3 · Othello + Gomoku, vs-computer mode for 6 duo games, shared info (how-to) button on every game"
   },

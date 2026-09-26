@@ -265,6 +265,24 @@ html:has(body.game) {
   box-shadow: 0 1px 2px var(--color-shadow);
 }
 
+/* ช่องพิมพ์ตัวเลขในหน้าต่าง (เลขเกมฟรีเซลล์ · เลขด่านเทน้ำ) */
+.field {
+  width: 100%;
+  min-height: var(--tap);
+  padding: 0 var(--space-sm);
+  border: var(--rule-hair);
+  border-radius: var(--radius-md);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-num);
+  font-size: var(--text-lg);
+}
+
+.field:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 1px;
+}
+
 /* stat chips in the header area */
 .stats {
   display: flex;

@@ -1,0 +1,279 @@
+/* Hallmark · extends App Shell (night cabin) · ภาพปริศนาเติมช่อง — หน้าเลือกภาพ + กระดานตัวเลขใบ้ · tokens only */
+
+.stage.ng {
+  gap: var(--space-sm);
+}
+
+/* ---------- หน้าเลือกภาพ ---------- */
+.ng-picker {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  margin: calc(var(--space-sm) * -1);
+  padding: var(--space-sm);
+}
+
+.ng-shelf + .ng-shelf {
+  margin-top: var(--space-lg);
+}
+
+.ng-shelf h2 {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 0 0 var(--space-xs);
+  font-size: var(--text-lg);
+  font-weight: 700;
+}
+
+.ng-shelf h2 small {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-ink-3);
+}
+
+.ng-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: var(--space-xs);
+}
+
+.ng-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2xs);
+  min-height: 92px;
+  padding: var(--space-xs) var(--space-2xs);
+  border: var(--rule-hair);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+  font-size: var(--text-xs);
+  line-height: 1.2;
+  color: var(--color-ink-2);
+  text-align: center;
+}
+
+.ng-tile:active {
+  background: var(--color-paper-3);
+}
+
+.ng-tile b {
+  font-family: var(--font-num);
+  font-size: var(--text-xl);
+  color: var(--color-ink);
+}
+
+.ng-tile svg {
+  width: 44px;
+  height: 44px;
+  color: var(--color-accent);
+}
+
+.ng-tile.is-done {
+  border-color: var(--color-ok);
+}
+
+.ng-tile.is-going {
+  border-color: var(--color-accent);
+}
+
+.ng-bar {
+  width: 70%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-paper-3);
+  overflow: hidden;
+}
+
+.ng-bar i {
+  display: block;
+  height: 100%;
+  background: var(--color-accent);
+}
+
+/* ---------- หน้าเล่น ---------- */
+.ng-play {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.ng-play[hidden] {
+  display: none;
+}
+
+.ng-top {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 var(--space-2xs);
+  color: var(--color-ink-2);
+}
+
+.ng-top > :last-child {
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.ng-wrap {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+}
+
+.ng-grid {
+  --cell: 24px;
+  --fs: 12px;
+  display: grid;
+  grid-template-columns: auto auto;
+  grid-template-rows: auto auto;
+  touch-action: none;
+}
+
+.ng-corner {
+  display: grid;
+  place-items: end;
+  padding: 0 4px 4px 0;
+}
+
+.ng-corner svg {
+  max-width: 100%;
+  max-height: 100%;
+  color: var(--color-ink);
+}
+
+.ng-cclues {
+  display: grid;
+  grid-template-columns: repeat(var(--n), var(--cell));
+  align-items: end;
+}
+
+.ng-rclues {
+  display: grid;
+  grid-template-rows: repeat(var(--n), var(--cell));
+  justify-items: end;
+}
+
+.ng-clue {
+  display: flex;
+  gap: 0.28em;
+  font-family: var(--font-num);
+  font-size: var(--fs);
+  font-weight: 700;
+  line-height: 1.12;
+  color: var(--color-ink);
+}
+
+.ng-cclues .ng-clue {
+  flex-direction: column;
+  align-items: center;
+  gap: 0.1em;
+  padding-bottom: 3px;
+}
+
+.ng-rclues .ng-clue {
+  align-items: center;
+  padding-right: 5px;
+}
+
+.ng-clue.is-ok {
+  color: var(--color-ink-3);
+  opacity: 0.55;
+}
+
+.ng-clue.is-hot {
+  color: var(--color-accent-text);
+}
+
+.ng-board {
+  display: grid;
+  grid-template-columns: repeat(var(--n), var(--cell));
+  grid-template-rows: repeat(var(--n), var(--cell));
+  border: 2px solid var(--color-ink-2);
+  background: var(--color-paper-2);
+}
+
+.ng-cell {
+  position: relative;
+  border-right: 1px solid var(--color-rule);
+  border-bottom: 1px solid var(--color-rule);
+}
+
+.ng-cell.is-r5 {
+  border-right: 2px solid var(--color-ink-3);
+}
+
+.ng-cell.is-b5 {
+  border-bottom: 2px solid var(--color-ink-3);
+}
+
+.ng-cell.is-hot {
+  background: var(--color-accent-wash);
+}
+
+.ng-cell[data-v="1"] {
+  background: var(--color-ink);
+  box-shadow: inset 0 0 0 1px var(--color-paper-2);
+}
+
+.ng-cell[data-v="2"]::before,
+.ng-cell[data-v="2"]::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 55%;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--color-ink-3);
+}
+
+.ng-cell[data-v="2"]::before {
+  transform: translate(-50%, -50%) rotate(45deg);
+}
+
+.ng-cell[data-v="2"]::after {
+  transform: translate(-50%, -50%) rotate(-45deg);
+}
+
+/* ชนะ: ภาพเปลี่ยนเป็นสีอุ่น */
+.ng-board.is-won {
+  border-color: var(--color-ok);
+}
+
+.ng-board.is-won .ng-cell[data-v="1"] {
+  background: var(--color-accent);
+  box-shadow: none;
+  transition: background-color var(--dur-slow) var(--ease-out);
+}
+
+.ng-board.is-won .ng-cell {
+  border-color: transparent;
+}
+
+.ng-tools {
+  flex: none;
+  display: flex;
+  justify-content: center;
+}
+
+.ng-mode {
+  width: min(100%, 22rem);
+}
+
+.ng-mode button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs);
+}
+
+.ng-mode svg {
+  width: 18px;
+  height: 18px;
+}

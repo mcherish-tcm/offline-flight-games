@@ -1,0 +1,177 @@
+/* Hallmark · extends App Shell (night cabin) · shared playing-card table for ฟรีเซลล์ + สไปเดอร์
+ * (โซลิแทร์เดิมยังใช้ style.css ของตัวเอง — ไม่แตะ) · tokens only
+ * Hallmark · pre-emit critique: P4 H4 E4 S4 R5 V4
+ */
+
+.stage.cards {
+  gap: var(--space-xs);
+  padding-inline: var(--space-2xs);
+}
+
+.cards-top {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  padding: 0 var(--space-xs);
+  font-size: var(--text-sm);
+  color: var(--color-ink-2);
+}
+
+.cards-top b {
+  color: var(--color-ink);
+  font-size: var(--text-md);
+}
+
+.cards-top > :last-child {
+  justify-self: end;
+  font-size: var(--text-md);
+  font-weight: 700;
+  color: var(--color-ink);
+}
+
+.cards-board {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  max-width: 44rem;
+  margin-inline: auto;
+  touch-action: none;
+  overflow: hidden;
+}
+
+.cards-board .slot {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: grid;
+  place-items: center;
+  border: 1.5px dashed var(--color-rule);
+  border-radius: var(--card-radius, 6px);
+  color: var(--color-rule);
+  font-size: var(--rank-size, 14px);
+  font-weight: 700;
+}
+
+.cards-board .slot svg {
+  width: 45%;
+  height: 45%;
+}
+
+.cards-board .slot.is-target {
+  border-color: var(--color-accent);
+  background: var(--color-accent-wash);
+}
+
+.cards-board .card {
+  position: absolute;
+  left: 0;
+  top: 0;
+  border-radius: var(--card-radius, 6px);
+  transition: transform var(--dur-med) var(--ease-out);
+  will-change: transform;
+}
+
+.cards-board .card.is-dragging {
+  transition: none;
+}
+
+.card__face,
+.card__back {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: 0 0 0 1px var(--color-card-edge), 0 1px 2px var(--color-card-edge);
+}
+
+.card__back {
+  background: repeating-linear-gradient(45deg, var(--color-card-back) 0 4px, var(--color-card-back-2) 4px 8px);
+  border: max(2px, calc(var(--card-w, 40px) * 0.06)) solid var(--color-card-face);
+}
+
+.card__face {
+  display: none;
+  background: var(--color-card-face);
+  color: var(--color-card-ink);
+  font-family: var(--font-num);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.card.is-up .card__face {
+  display: block;
+}
+
+.card.is-up .card__back {
+  display: none;
+}
+
+.card.is-red .card__face {
+  color: var(--color-card-red);
+}
+
+.card__rank {
+  position: absolute;
+  left: 7%;
+  top: 5%;
+  font-size: var(--rank-size, 16px);
+  letter-spacing: -0.05em;
+}
+
+.card__pip {
+  position: absolute;
+  right: 6%;
+  top: 5%;
+  width: var(--pip-size, 13px);
+  height: var(--pip-size, 13px);
+}
+
+.card__big {
+  position: absolute;
+  left: 50%;
+  bottom: 10%;
+  width: 52%;
+  height: 40%;
+  transform: translateX(-50%);
+}
+
+/* ไพ่แคบ (สไปเดอร์ 10 แถว บนจอเล็ก): ดอกเล็กไปอยู่ใต้ตัวเลข อ่านได้ตอนไพ่ซ้อนกัน */
+.cards-board.is-narrow .card__pip {
+  right: auto;
+  left: 8%;
+  top: calc(7% + var(--rank-size, 14px));
+}
+
+.cards-board.is-narrow .card__big {
+  width: 60%;
+  bottom: 8%;
+}
+
+.card.is-hint .card__face {
+  box-shadow: 0 0 0 2px var(--color-accent);
+}
+
+.card.is-shake {
+  animation: card-shake 220ms var(--ease-in-out);
+}
+
+@keyframes card-shake {
+  25% {
+    translate: -4px 0;
+  }
+  75% {
+    translate: 4px 0;
+  }
+}
+
+.cards-auto {
+  flex: none;
+  width: 100%;
+  max-width: 26rem;
+  margin-inline: auto;
+}
+
+.cards-auto svg {
+  width: 20px;
+  height: 20px;
+}

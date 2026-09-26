@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f1622" />
+    <title>ฟรีเซลล์ · เกมบนเครื่องบิน</title>
+    <link rel="manifest" href="../../manifest.webmanifest" />
+    <link rel="icon" href="../../icons/icon.svg" type="image/svg+xml" />
+    <script>
+      try {
+        if (localStorage.getItem('ffg:theme') === '"light"') document.documentElement.setAttribute('data-theme', 'light');
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="../../shared/tokens.css" />
+    <link rel="stylesheet" href="../../shared/base.css" />
+    <link rel="stylesheet" href="../../shared/cards.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="../../shared/games.js" defer></script>
+    <script src="../../shared/app.js" data-root="../../" defer></script>
+    <script src="../../shared/cards.js" defer></script>
+    <script src="engine.js" defer></script>
+    <script src="game.js" defer></script>
+  </head>
+  <body class="game">
+    <header class="bar">
+      <a class="bar__back" href="../../" data-icon="back">หน้าแรก</a>
+      <h1 class="bar__title">ฟรีเซลล์</h1>
+      <div class="bar__actions">
+        <button type="button" class="icon-btn" data-howto="freecell" data-icon="info" aria-label="วิธีเล่น"></button>
+        <button type="button" class="icon-btn" id="undo" data-icon="undo" aria-label="ย้อน" disabled></button>
+        <button type="button" class="icon-btn" id="new" data-icon="restart" aria-label="แจกใหม่ / เลือกเลขเกม"></button>
+      </div>
+    </header>
+    <main class="stage cards">
+      <div class="cards-top">
+        <span>ย้าย <b class="num" id="moves">0</b></span>
+        <span class="num" id="deal"></span>
+        <span class="num" id="time">0:00</span>
+      </div>
+      <div class="cards-board" id="board" aria-label="โต๊ะไพ่ แตะไพ่เพื่อย้ายไปที่ที่ลงได้ หรือลากวาง"></div>
+      <button type="button" class="btn btn--primary cards-auto" id="auto" data-icon="wand" hidden>เก็บไพ่ที่เหลือขึ้นกอง</button>
+    </main>
+  </body>
+</html>

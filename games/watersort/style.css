@@ -1,0 +1,169 @@
+/* Hallmark · extends App Shell (night cabin) · เทน้ำเรียงสี — ชั้นวางหลอดแก้ว · tokens only (สีน้ำ = --color-g0…g11) */
+
+.stage.ws {
+  gap: var(--space-sm);
+}
+
+.ws-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 0 var(--space-xs);
+  color: var(--color-ink-2);
+}
+
+.ws-level b {
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  color: var(--color-ink);
+}
+
+.ws-moves b {
+  color: var(--color-ink);
+}
+
+.ws-wrap {
+  flex: 1;
+  min-height: 0;
+  container-type: size;
+  display: grid;
+  place-items: center;
+}
+
+.ws-rack {
+  --cols: 5;
+  --unit: min(calc((100cqh - 4.5rem) / 2 / 5.2), 34px);
+  display: grid;
+  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  justify-items: center;
+  row-gap: var(--space-xl);
+  column-gap: var(--space-2xs);
+  width: min(100cqw, calc(var(--cols) * 4.2rem));
+}
+
+.ws-rack.is-one-row {
+  --unit: min(calc((100cqh - 2rem) / 5.2), 40px);
+}
+
+.ws-tube {
+  position: relative;
+  display: flex;
+  flex-direction: column-reverse;
+  justify-content: flex-start;
+  width: min(100%, calc(var(--unit) * 1.45));
+  height: calc(var(--unit) * 4 + 14px);
+  padding: 0 3px 4px;
+  border: 2px solid var(--color-ink-3);
+  border-top: 0;
+  border-radius: 0 0 50% 50% / 0 0 calc(var(--unit) * 0.9) calc(var(--unit) * 0.9);
+  background: var(--color-paper-2);
+  overflow: hidden;
+  transition: transform var(--dur-med) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+/* ปากหลอด */
+.ws-tube::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -2px;
+  right: -2px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--color-ink-3);
+}
+
+.ws-tube.is-picked {
+  transform: translateY(-14px);
+  border-color: var(--color-accent);
+}
+
+.ws-tube.is-picked::before {
+  background: var(--color-accent);
+}
+
+.ws-tube.is-hint {
+  border-color: var(--color-ok);
+}
+
+.ws-tube.is-done {
+  border-color: var(--color-ok);
+}
+
+.ws-tube.is-done::after {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 50%;
+  width: 10px;
+  height: 6px;
+  border-left: 2.5px solid var(--color-ok);
+  border-bottom: 2.5px solid var(--color-ok);
+  transform: translateX(-50%) rotate(-45deg);
+}
+
+.ws-unit {
+  flex: none;
+  height: var(--unit);
+  background: var(--wc);
+  box-shadow: inset 0 2px 0 oklch(100% 0 0 / 0.18);
+}
+
+.ws-unit:first-child {
+  border-radius: 0 0 50% 50% / 0 0 calc(var(--unit) * 0.8) calc(var(--unit) * 0.8);
+}
+
+.ws-unit.is-new {
+  animation: ws-fill var(--dur-slow) var(--ease-out);
+}
+
+@keyframes ws-fill {
+  from {
+    opacity: 0.2;
+    transform: scaleY(0.4);
+    transform-origin: bottom;
+  }
+}
+
+.ws-tube.is-shake {
+  animation: ws-shake 220ms var(--ease-in-out);
+}
+
+@keyframes ws-shake {
+  25% {
+    translate: -4px 0;
+  }
+  75% {
+    translate: 4px 0;
+  }
+}
+
+[data-c="0"] { --wc: var(--color-g0); }
+[data-c="1"] { --wc: var(--color-g1); }
+[data-c="2"] { --wc: var(--color-g2); }
+[data-c="3"] { --wc: var(--color-g3); }
+[data-c="4"] { --wc: var(--color-g4); }
+[data-c="5"] { --wc: var(--color-g5); }
+[data-c="6"] { --wc: var(--color-g6); }
+[data-c="7"] { --wc: var(--color-g7); }
+[data-c="8"] { --wc: var(--color-g8); }
+[data-c="9"] { --wc: var(--color-g9); }
+[data-c="10"] { --wc: var(--color-g10); }
+[data-c="11"] { --wc: var(--color-g11); }
+
+.ws-tools {
+  flex: none;
+  display: flex;
+  justify-content: center;
+}
+
+.ws-tools .btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ws-tube:hover {
+    border-color: var(--color-ink-2);
+  }
+}

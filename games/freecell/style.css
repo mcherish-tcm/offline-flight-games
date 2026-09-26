@@ -1,0 +1,14 @@
+/* Hallmark · extends App Shell (night cabin) · ฟรีเซลล์ — ใช้ shared/cards.css เป็นหลัก · tokens only */
+
+/* ช่องพัก 4 ช่องซ้ายบน: เส้นทึบบาง ต่างจากกองเก็บ (เส้นประ + รูปดอก) */
+.cards-board .slot--cell {
+  border-style: solid;
+  border-color: var(--color-paper-3);
+  background: var(--color-paper-2);
+}
+
+.fc-limit {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+}
