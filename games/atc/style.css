@@ -1,0 +1,133 @@
+/* Hallmark · extends App Shell (night cabin) · หอบังคับการบิน — สนามบินมองจากด้านบนบน canvas · สีของเป้าลงจอดอ่านจาก token เหล่านี้ตอนวาด */
+:root {
+  --atc-ground: oklch(27% 0.035 170);
+  --atc-grid: oklch(32% 0.035 170);
+  --atc-asphalt: oklch(20% 0.012 255);
+  --atc-mark: oklch(88% 0.01 85);
+  --atc-jet: oklch(77% 0.15 55);
+  --atc-small: oklch(79% 0.12 232);
+  --atc-heli: oklch(84% 0.17 135);
+  --atc-outline: oklch(14% 0.02 255);
+  --atc-warn: var(--color-danger);
+}
+
+:root[data-theme="light"] {
+  --atc-ground: oklch(85% 0.05 150);
+  --atc-grid: oklch(80% 0.05 150);
+  --atc-asphalt: oklch(42% 0.012 255);
+  --atc-mark: oklch(97% 0.005 85);
+  --atc-jet: oklch(66% 0.17 50);
+  --atc-small: oklch(57% 0.14 245);
+  --atc-heli: oklch(55% 0.15 145);
+  --atc-outline: oklch(22% 0.02 255);
+}
+
+.stage.atc {
+  gap: var(--space-xs);
+}
+
+.atc-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+.atc-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-md);
+  background: var(--atc-ground);
+  touch-action: none;
+}
+
+.atc-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  text-align: center;
+  background: color-mix(in oklch, var(--color-paper) 82%, transparent);
+  -webkit-backdrop-filter: blur(3px);
+  backdrop-filter: blur(3px);
+  border-radius: var(--radius-md);
+}
+
+.atc-overlay[hidden] {
+  display: none;
+}
+
+.atc-overlay__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--color-ink);
+}
+
+.atc-overlay__text {
+  margin: 0;
+  max-width: 20rem;
+  color: var(--color-ink-2);
+}
+
+.atc-overlay__text b {
+  color: var(--color-ink);
+}
+
+.atc-legend {
+  display: grid;
+  gap: var(--space-2xs);
+  margin: 0;
+  padding: var(--space-xs) var(--space-sm);
+  list-style: none;
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+  font-size: var(--text-sm);
+  text-align: left;
+  color: var(--color-ink-2);
+}
+
+.atc-legend li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.atc-legend__dot {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--atc-jet);
+  box-shadow: 0 0 0 2px var(--atc-outline);
+}
+
+.atc-legend [data-t="small"] .atc-legend__dot {
+  background: var(--atc-small);
+}
+
+.atc-legend [data-t="heli"] .atc-legend__dot {
+  background: var(--atc-heli);
+}
+
+.atc-overlay__mode {
+  width: min(100%, 18rem);
+}
+
+.atc-overlay .btn {
+  min-width: 12rem;
+  min-height: 52px;
+}
+
+.atc-overlay .btn svg {
+  width: 20px;
+  height: 20px;
+}

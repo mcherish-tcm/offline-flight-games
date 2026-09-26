@@ -44,7 +44,10 @@
   gap: var(--space-sm);
   padding: var(--space-lg);
   text-align: center;
-  background: var(--color-scrim);
+  /* พื้นเกือบทึบ + เบลอ: งูกับอาหารไม่โผล่แทรกระหว่างตัวหนังสือ */
+  background: color-mix(in oklch, var(--color-paper) 90%, transparent);
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
   border-radius: var(--radius-md);
 }
 

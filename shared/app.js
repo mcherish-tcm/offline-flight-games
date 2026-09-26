@@ -418,7 +418,73 @@
     });
   }
 
+  /* ---------- ขอบล่างจอ (กันแถบปุ่ม/แถบท่าทางของ Android บังปุ่มล่างสุด) ----------
+   * Chrome Android (135+) วาดหน้าเว็บลอดใต้แถบท่าทางด้านล่าง และบอกความสูงแถบผ่าน env(safe-area-inset-bottom)
+   * แต่ตอนเปิดเป็นแอปที่ติดตั้งแล้ว (standalone) บางเครื่องได้ค่า 0 ทั้งที่หน้ายังลอดใต้แถบ → ปุ่มล่างสุดโดนบัง
+   * ทางแก้: CSS ใช้ --fg-safe-bottom = ค่าที่มากกว่าระหว่าง env(...) กับ --fg-pad-bottom (ตั้งจากตรงนี้)
+   * ค่าที่ผู้ใช้เลือก (หน้าแรก → "ขอบล่างจอ"): 'auto' (ค่าเริ่มต้น) · 0 · 24 · 48 · 72 (px)
+   */
+  var GAP_KEY = 'bottomgap';
+  var GAP_AUTO_PX = 48;
+
+  function envBottom() {
+    try {
+      var d = document.createElement('div');
+      d.style.cssText = 'position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;padding-bottom:env(safe-area-inset-bottom,0px)';
+      document.body.appendChild(d);
+      var v = parseFloat(getComputedStyle(d).paddingBottom) || 0;
+      d.parentNode.removeChild(d);
+      return v;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  function isStandalone() {
+    try {
+      return (
+        ['standalone', 'fullscreen', 'minimal-ui'].some(function (m) {
+          return window.matchMedia('(display-mode: ' + m + ')').matches;
+        }) || navigator.standalone === true
+      );
+    } catch (e) {
+      return false;
+    }
+  }
+
+  // เดาเองเมื่อผู้ใช้ไม่ได้เลือก: เฉพาะแอปที่ติดตั้งบน Android ที่ Chrome ไม่บอกความสูงแถบ (env = 0)
+  // และหน้าจอสูงเกือบเท่าจอจริง (ถูกหักแค่แถบสถานะด้านบน = หน้าลอดใต้แถบล่าง) → เว้น 48px
+  function autoGap() {
+    if (!/Android/i.test(navigator.userAgent || '') || !isStandalone()) return 0;
+    if (envBottom() > 0) return 0;
+    var gap = (window.screen && screen.height ? screen.height : 0) - window.innerHeight;
+    return gap >= 72 ? 0 : GAP_AUTO_PX;
+  }
+
+  function getGap() {
+    var v = store.get(GAP_KEY, 'auto');
+    return v === 'auto' || [0, 24, 48, 72].indexOf(v) === -1 ? 'auto' : v;
+  }
+
+  function applyGap() {
+    var v = getGap();
+    var px = v === 'auto' ? autoGap() : v;
+    document.documentElement.style.setProperty('--fg-pad-bottom', px + 'px');
+    return px;
+  }
+
+  function setGap(v) {
+    store.set(GAP_KEY, v);
+    return applyGap();
+  }
+
   /* ---------- boot ---------- */
+  applyGap();
+  var gapTimer = 0;
+  window.addEventListener('resize', function () {
+    clearTimeout(gapTimer);
+    gapTimer = setTimeout(applyGap, 150);
+  });
   applyTheme(getTheme());
   fillIcons(document);
   wireHowto(document);
@@ -448,6 +514,10 @@
     offlineStatus: offlineStatus,
     howto: howto,
     howtoExtra: null,
+    getGap: getGap,
+    setGap: setGap,
+    envBottom: envBottom,
+    isStandalone: isStandalone,
     isSheetOpen: function () {
       return !!openSheet;
     }

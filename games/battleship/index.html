@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f1622" />
+    <title>เรือรบ · เกมบนเครื่องบิน</title>
+    <link rel="manifest" href="../../manifest.webmanifest" />
+    <link rel="icon" href="../../icons/icon.svg" type="image/svg+xml" />
+    <script>
+      try {
+        if (localStorage.getItem('ffg:theme') === '"light"') document.documentElement.setAttribute('data-theme', 'light');
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="../../shared/tokens.css" />
+    <link rel="stylesheet" href="../../shared/base.css" />
+    <link rel="stylesheet" href="../../shared/duo.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="../../shared/games.js" defer></script>
+    <script src="../../shared/app.js" data-root="../../" defer></script>
+    <script src="engine.js" defer></script>
+    <script src="game.js" defer></script>
+  </head>
+  <body class="game">
+    <header class="bar">
+      <a class="bar__back" href="../../" data-icon="back">หน้าแรก</a>
+      <h1 class="bar__title">เรือรบ</h1>
+      <div class="bar__actions">
+        <button type="button" class="icon-btn" data-howto="battleship" data-icon="info" aria-label="วิธีเล่น"></button>
+        <button type="button" class="icon-btn" id="settings" data-icon="sliders" aria-label="ตั้งค่า · เล่นกับคอม · กติกาการยิง"></button>
+        <button type="button" class="icon-btn" id="restart" data-icon="restart" aria-label="เกมใหม่"></button>
+      </div>
+    </header>
+    <main class="stage bs" id="stage">
+      <div class="bs-top">
+        <span class="bs-turn" id="turn" data-p="0"><span class="bs-turn__dot" aria-hidden="true"></span><span id="turn-text"></span></span>
+        <span class="bs-score num" id="score"></span>
+      </div>
+      <div class="seg bs-view" id="view" role="radiogroup" aria-label="เลือกกระดานที่จะดู">
+        <button type="button" role="radio" data-view="enemy" aria-checked="true">ทะเลศัตรู</button>
+        <button type="button" role="radio" data-view="own" aria-checked="false">ทะเลของเรา</button>
+      </div>
+      <div class="bs-wrap" id="wrap">
+        <div class="bs-board" id="board" role="grid"></div>
+      </div>
+      <div class="bs-fleet" id="fleet" aria-label="สถานะเรือ"></div>
+      <p class="bs-msg" id="msg" aria-live="polite"></p>
+      <div class="bs-place" id="place" hidden>
+        <div class="bs-tray" id="tray" aria-label="เลือกเรือที่จะย้าย"></div>
+        <div class="bs-actions">
+          <button type="button" class="btn" id="rotate">หมุน</button>
+          <button type="button" class="btn" id="shuffle" data-icon="restart">สุ่มใหม่</button>
+          <button type="button" class="btn btn--primary" id="ready">พร้อมแล้ว</button>
+        </div>
+      </div>
+      <div class="bs-actions" id="after" hidden>
+        <button type="button" class="btn btn--primary" id="again">เกมใหม่</button>
+      </div>
+    </main>
+    <div class="bs-cover" id="cover" hidden>
+      <div class="bs-cover__box">
+        <span class="bs-cover__chip" id="cover-chip" aria-hidden="true"></span>
+        <p class="bs-cover__title" id="cover-title"></p>
+        <p class="bs-cover__text" id="cover-text"></p>
+        <p class="bs-cover__report" id="cover-report"></p>
+        <button type="button" class="btn btn--primary bs-cover__go" id="cover-go"></button>
+      </div>
+    </div>
+  </body>
+</html>

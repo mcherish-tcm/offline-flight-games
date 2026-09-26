@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f1622" />
+    <title>หอบังคับการบิน · เกมบนเครื่องบิน</title>
+    <link rel="manifest" href="../../manifest.webmanifest" />
+    <link rel="icon" href="../../icons/icon.svg" type="image/svg+xml" />
+    <script>
+      try {
+        if (localStorage.getItem('ffg:theme') === '"light"') document.documentElement.setAttribute('data-theme', 'light');
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="../../shared/tokens.css" />
+    <link rel="stylesheet" href="../../shared/base.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="../../shared/games.js" defer></script>
+    <script src="../../shared/app.js" data-root="../../" defer></script>
+    <script src="engine.js" defer></script>
+    <script src="game.js" defer></script>
+  </head>
+  <body class="game">
+    <header class="bar">
+      <a class="bar__back" href="../../" data-icon="back">หน้าแรก</a>
+      <h1 class="bar__title">หอบังคับการบิน</h1>
+      <div class="bar__actions">
+        <button type="button" class="icon-btn" data-howto="atc" data-icon="info" aria-label="วิธีเล่น"></button>
+        <button type="button" class="icon-btn" id="pause" data-icon="pause" aria-label="หยุดชั่วคราว" disabled></button>
+      </div>
+    </header>
+    <main class="stage atc">
+      <div class="stats">
+        <div class="stat"><span class="stat__label" id="score-label">ลงจอด</span><span class="stat__value" id="score">0</span></div>
+        <div class="stat"><span class="stat__label" id="best-label">สถิติ</span><span class="stat__value" id="best">0</span></div>
+      </div>
+      <div class="atc-wrap" id="wrap">
+        <canvas class="atc-canvas" id="canvas" aria-label="สนามบิน ลากนิ้วจากเครื่องบินเพื่อวาดเส้นทางบิน"></canvas>
+        <div class="atc-overlay" id="overlay">
+          <p class="atc-overlay__title" id="ov-title">หอบังคับการบิน</p>
+          <p class="atc-overlay__text" id="ov-text"></p>
+          <ul class="atc-legend" id="ov-legend">
+            <li data-t="jet"><span class="atc-legend__dot"></span>เครื่องบินใหญ่ → รันเวย์ยาว</li>
+            <li data-t="small"><span class="atc-legend__dot"></span>เครื่องบินเล็ก → รันเวย์สั้น</li>
+            <li data-t="heli"><span class="atc-legend__dot"></span>เฮลิคอปเตอร์ → ลานจอด H</li>
+          </ul>
+          <div class="atc-overlay__mode" id="ov-mode"></div>
+          <button type="button" class="btn btn--primary" id="ov-go" data-icon="play">เริ่มเล่น</button>
+        </div>
+      </div>
+    </main>
+  </body>
+</html>

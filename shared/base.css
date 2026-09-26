@@ -20,6 +20,12 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* ขอบล่างที่ปลอดภัย = ค่าที่มากกว่าระหว่างที่ Chrome บอก (env) กับที่ app.js ตั้งให้ (--fg-pad-bottom)
+ * ดู "ขอบล่างจอ" ใน shared/app.js — กันแถบท่าทาง/แถบปุ่มของ Android บังปุ่มล่างสุดตอนเปิดเป็นแอปที่ติดตั้ง */
+:root {
+  --fg-safe-bottom: max(env(safe-area-inset-bottom, 0px), var(--fg-pad-bottom, 0px));
+}
+
 body {
   min-height: 100dvh;
 }
@@ -75,7 +81,9 @@ body.game {
   user-select: none;
   -webkit-user-select: none;
   -webkit-touch-callout: none;
-  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  /* สูงเท่าจอที่มองเห็นพอดี (inset: 0) — ไม่ใช้ 100dvh เพราะบน Android แบบวาดลอดขอบ 100dvh รวมใต้แถบล่างด้วย ดันปุ่มล่างตกจอ */
+  min-height: 0;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) var(--fg-safe-bottom) env(safe-area-inset-left);
 }
 
 html:has(body.game) {
@@ -379,7 +387,7 @@ html:has(body.game) {
 .toast {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--space-lg) + env(safe-area-inset-bottom));
+  bottom: calc(var(--space-lg) + var(--fg-safe-bottom));
   z-index: 40;
   max-width: calc(100% - 2 * var(--space-md));
   padding: var(--space-xs) var(--space-md);
@@ -403,7 +411,7 @@ html:has(body.game) {
   position: fixed;
   left: var(--space-md);
   right: var(--space-md);
-  bottom: calc(var(--space-md) + env(safe-area-inset-bottom));
+  bottom: calc(var(--space-md) + var(--fg-safe-bottom));
   z-index: 50;
   display: flex;
   align-items: center;

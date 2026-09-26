@@ -40,7 +40,11 @@
     othello:
       '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="28" height="28" rx="3"/><circle cx="12.5" cy="12.5" r="4"/><circle class="fg-accent" cx="21.5" cy="12.5" r="4"/><circle class="fg-accent" cx="12.5" cy="21.5" r="4"/><circle cx="21.5" cy="21.5" r="4"/></svg>',
     gomoku:
-      '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h26M4 17h26M4 26h26M8 4v26M17 4v26M26 4v26" stroke-width="1.3"/><circle class="fg-accent" cx="8" cy="26" r="3.2"/><circle class="fg-accent" cx="17" cy="17" r="3.2"/><circle class="fg-accent" cx="26" cy="8" r="3.2"/><circle cx="8" cy="8" r="3.2"/><circle cx="26" cy="26" r="3.2"/></svg>'
+      '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h26M4 17h26M4 26h26M8 4v26M17 4v26M26 4v26" stroke-width="1.3"/><circle class="fg-accent" cx="8" cy="26" r="3.2"/><circle class="fg-accent" cx="17" cy="17" r="3.2"/><circle class="fg-accent" cx="26" cy="8" r="3.2"/><circle cx="8" cy="8" r="3.2"/><circle cx="26" cy="26" r="3.2"/></svg>',
+    battleship:
+      '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M4 20h26l-3.2 6.2a2 2 0 0 1-1.8 1.1H9a2 2 0 0 1-1.8-1.1z"/><path d="M10 20v-5h6v-4h3v4h5l2 5"/><circle class="fg-accent" cx="26" cy="8" r="3.4" stroke-width="0"/><path d="M26 3v2M26 11v2M21 8h2M29 8h2" stroke-width="1.4"/></svg>',
+    atc:
+      '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="21" y="6" width="7" height="24" rx="1.5"/><path d="M24.5 11v3M24.5 18v3M24.5 25v2" stroke-width="1.3"/><path d="M4 27c3-9 8-14 15-15" stroke-dasharray="2 3" stroke-width="1.6"/><path class="fg-accent" d="M9.5 9l2.2-1.3 5.2 2.4 2.4-1.4a1.2 1.2 0 0 1 1.2 2.1l-2.4 1.4-1 5.6-2.2 1.3.1-4.9-3.2 1.9-.3 1.8-1.5.9-.3-2.9-2.3-1.8 1.5-.9 1.7.5 3.2-1.9z" stroke-width="0"/></svg>'
   };
 
   function glyph(game) {
@@ -157,6 +161,41 @@
   themeBtn.addEventListener('click', function () {
     FG.setTheme(FG.getTheme() === 'light' ? 'dark' : 'light');
     paintThemeBtn();
+  });
+
+  // ขอบล่างจอ: ถ้าแถบปุ่ม/แถบท่าทางของมือถือบังปุ่มล่างสุดในเกม ให้เว้นเพิ่ม (ค่าจริงอยู่ใน shared/app.js)
+  document.getElementById('gap-btn').addEventListener('click', function () {
+    var cur = FG.getGap();
+    var body = document.createElement('div');
+    body.appendChild(FG.label('เว้นที่ว่างใต้ปุ่มล่างสุด'));
+    var note = document.createElement('p');
+    note.className = 'sheet__text';
+    function paintNote(px) {
+      note.textContent = 'ตอนนี้เว้นอยู่ ' + Math.round(Math.max(px, FG.envBottom())) + ' px' + (FG.isStandalone() ? ' (เปิดแบบแอป)' : ' (เปิดในเบราว์เซอร์)');
+    }
+    body.appendChild(
+      FG.choice(
+        [
+          { value: 'auto', label: 'อัตโนมัติ' },
+          { value: 0, label: 'ไม่เว้น' },
+          { value: 24, label: 'น้อย' },
+          { value: 48, label: 'กลาง' },
+          { value: 72, label: 'มาก' }
+        ],
+        cur,
+        function (v) {
+          paintNote(FG.setGap(v));
+        }
+      )
+    );
+    body.appendChild(note);
+    paintNote(FG.setGap(cur));
+    FG.sheet({
+      title: 'ขอบล่างจอ',
+      text: 'ถ้าในเกม ปุ่มแถวล่างสุดถูกแถบปุ่มหรือขีดปัดของมือถือบัง ให้เลือก <b>กลาง</b> หรือ <b>มาก</b> แล้วเปิดเกมดูอีกครั้ง · ปกติใช้ <b>อัตโนมัติ</b>',
+      body: body,
+      actions: [{ label: 'เสร็จ', primary: true }]
+    });
   });
 
   var installBtn = document.getElementById('install-btn');

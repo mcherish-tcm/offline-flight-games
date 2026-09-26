@@ -4,7 +4,7 @@ body.hub {
   display: flex;
   flex-direction: column;
   min-height: 100dvh;
-  padding: env(safe-area-inset-top) max(var(--space-md), env(safe-area-inset-right)) env(safe-area-inset-bottom) max(var(--space-md), env(safe-area-inset-left));
+  padding: env(safe-area-inset-top) max(var(--space-md), env(safe-area-inset-right)) var(--fg-safe-bottom) max(var(--space-md), env(safe-area-inset-left));
   overscroll-behavior-y: none;
 }
 

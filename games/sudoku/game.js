@@ -347,17 +347,25 @@
       list.appendChild(b);
     });
     var hasGame = S && !S.done;
-    FG.sheet({
+    var dlg = FG.sheet({
       title: 'เกมใหม่ — เลือกระดับ',
       text: hasGame ? 'เกมที่เล่นอยู่จะหายไป' : '',
       body: list,
       dismissible: !!S,
       actions: S ? [{ label: 'ยกเลิก' }] : []
     });
+    // ยังไม่มีเกม แต่หน้าต่างถูกปิดไปโดยไม่ได้เลือก (เช่น ปัดย้อนกลับบน Android) → บอกให้แตะตารางเพื่อเลือกระดับ
+    dlg.addEventListener('close', function () {
+      if (!S) levelEl.textContent = 'แตะตารางเพื่อเลือกระดับ';
+    });
   }
 
   /* ---------- input ---------- */
   boardEl.addEventListener('click', function (e) {
+    if (!S) {
+      askNew();
+      return;
+    }
     var cell = e.target.closest('.sd-cell');
     if (!cell) return;
     sel = +cell.dataset.i;
@@ -366,7 +374,11 @@
 
   padEl.addEventListener('click', function (e) {
     var key = e.target.closest('.sd-key');
-    if (!key || !S) return;
+    if (!key) return;
+    if (!S) {
+      askNew();
+      return;
+    }
     if (sel < 0) {
       FG.toast('แตะช่องในตารางก่อน');
       return;
