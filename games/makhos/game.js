@@ -1,4 +1,4 @@
-/* หมากฮอสไทย — หน้าจอ: แตะหมาก → เห็นช่องที่ไปได้, บังคับกิน (ปิดได้ในตั้งค่า), กินต่อทีละช่อง, ขอเสมอ, ตำแหน่งซ้ำ 3 ครั้ง = เสมอ */
+/* หมากฮอสไทย — หน้าจอ (2 คน หรือเล่นกับคอม ai.js): แตะหมาก → เห็นช่องที่ไปได้, บังคับกิน (ปิดได้ในตั้งค่า), กินต่อทีละช่อง, ขอเสมอ, ตำแหน่งซ้ำ 3 ครั้ง = เสมอ */
 (function () {
   'use strict';
 
@@ -18,7 +18,8 @@
     chip: function () {
       return CHIP;
     },
-    action: { label: 'ขอเสมอ', onClick: offerDraw }
+    action: { label: 'ขอเสมอ', onClick: offerDraw },
+    ai: true
   });
 
   // S = { g: สถานะจาก engine { board, turn, rep, over, last }, starter, agreed: bool }
@@ -75,6 +76,7 @@
       return;
     }
     var turn = S.g.turn;
+    if (duo.isCPU(turn)) return; // รอคอมเดิน
 
     if (sel) {
       var hopCands = sel.cands.filter(function (m) {
@@ -133,9 +135,49 @@
     render();
     save();
     if (S.g.over) setTimeout(showResult, 700);
+    else cpuTurn();
+  }
+
+  // ถึงตาคอม → คิดจากตาเดินที่ถูกกติกาเท่านั้น (บังคับกิน/ไม่บังคับ ตามตั้งค่าตอนนั้น)
+  function cpuTurn() {
+    if (isOver() || !duo.isCPU(S.g.turn)) return;
+    duo.cpuMove(
+      function () {
+        return MakhosAI.choose(S.g.board, S.g.turn, duo.level(), null, { forceCapture: force() });
+      },
+      function (mv) {
+        if (!mv || isOver() || !duo.isCPU(S.g.turn)) return;
+        var ok = M.legalMoves(S.g.board, S.g.turn, opts()).filter(function (m) {
+          return M.sameMove(m, mv);
+        })[0];
+        if (ok) execute(ok);
+        else cpuTurn(); // กติกาเปลี่ยนระหว่างคิด → คิดใหม่
+      }
+    );
+  }
+
+  function agreeDraw() {
+    S.agreed = true;
+    endedAt = Date.now();
+    sel = null;
+    duo.cancelCPU();
+    duo.draw();
+    render();
+    save();
+    setTimeout(showResult, 300);
   }
 
   function offerDraw(p) {
+    if (duo.isAI()) {
+      // เล่นกับคอม: คอมตัดสินเอง — ยอมเมื่อไม่ได้เปรียบชัดเจน
+      if (MakhosAI.acceptsDraw(S.g.board, 1)) {
+        FG.toast('คอมตกลงเสมอ');
+        agreeDraw();
+      } else {
+        FG.toast('คอมไม่ตกลง — เล่นต่อ', 2000);
+      }
+      return;
+    }
     var dlg = FG.sheet({
       title: duo.name(p) + 'ขอเสมอ',
       text: duo.name(1 - p) + ' ตกลงให้ตานี้เสมอไหม?',
@@ -144,15 +186,7 @@
         {
           label: 'ตกลง เสมอ',
           primary: true,
-          onClick: function () {
-            S.agreed = true;
-            endedAt = Date.now();
-            sel = null;
-            duo.draw();
-            render();
-            save();
-            setTimeout(showResult, 300);
-          }
+          onClick: agreeDraw
         }
       ]
     });
@@ -161,20 +195,24 @@
 
   function nextRound() {
     FG.closeSheet();
+    duo.cancelCPU();
     S = fresh(1 - S.starter);
     sel = null;
     arrivedAt = -1;
     render();
     save();
+    cpuTurn();
   }
 
   function restartRound() {
     FG.closeSheet();
+    duo.cancelCPU();
     S = fresh(S.starter);
     sel = null;
     arrivedAt = -1;
     render();
     save();
+    cpuTurn();
   }
 
   function showResult() {
@@ -266,6 +304,7 @@
       if (sel && sel.step > 0) hint = 'กินต่อได้อีก — แตะวงสีเหลืองช่องถัดไป';
       else if (sel) hint = 'แตะจุดสีเหลืองเพื่อเดิน · แตะหมากตัวเดิมเพื่อยกเลิก';
       else if (forced) hint = 'มีทางกิน ต้องกิน — ตัวที่กินได้มีวงสีเหลือง';
+      else if (duo.isCPU(S.g.turn)) hint = 'คอมกำลังคิด…';
       else hint = 'ตาของ' + duo.name(S.g.turn) + ' — แตะหมากที่จะเดิน';
     } else {
       hint = 'แตะกระดานเพื่อเล่นตาต่อไป';
@@ -285,8 +324,8 @@
     duo.note(!isOver() && moveCount() > 0);
   }
 
-  /* ---------- sheets ---------- */
-  function showRules() {
+  /* ---------- วิธีเล่น (ปุ่ม ⓘ): ข้อสั้นจาก games.js + กติกาบ้านเรา + กติกาเต็ม (กดเปิดอ่าน) ---------- */
+  function rulesList() {
     var ul = document.createElement('ul');
     ul.className = 'mk-rules';
     ul.innerHTML = [
@@ -306,10 +345,34 @@
         return '<li>' + t + '</li>';
       })
       .join('');
-    FG.sheet({ title: 'กติกาหมากฮอสไทย', body: ul, actions: [{ label: 'เข้าใจแล้ว', primary: true }] });
+    return ul;
   }
 
-  document.getElementById('rules').addEventListener('click', showRules);
+  FG.howtoExtra = function (box) {
+    var house = document.createElement('div');
+    house.className = 'howto';
+    house.appendChild(FG.label('กติกาบ้านเรา (เปลี่ยนได้ในตั้งค่า)'));
+    var ul = document.createElement('ul');
+    ul.className = 'howto__list';
+    ul.innerHTML = [
+      force()
+        ? 'ตอนนี้ตั้งเป็น <b>บังคับกิน</b> — มีทางกินต้องกิน (ตัวที่กินได้มีวงสีเหลือง)'
+        : 'ตอนนี้ตั้งเป็น <b>ไม่บังคับกิน</b> — มีทางกินก็เลือกเดินธรรมดาได้',
+      'ฮอสกินแล้วต้องลง<b>ช่องที่ติดหลังตัวที่ถูกกิน</b>ทันที',
+      '<b>เสมอ</b>: กดปุ่ม "ขอเสมอ" แล้วอีกฝ่ายตกลง (เล่นกับคอม = คอมตัดสินเอง) หรือตำแหน่งเดิมวนซ้ำครบ 3 ครั้ง'
+    ]
+      .map(function (t) {
+        return '<li>' + t + '</li>';
+      })
+      .join('');
+    house.appendChild(ul);
+    box.appendChild(house);
+    var more = document.createElement('details');
+    more.className = 'howto__more';
+    more.innerHTML = '<summary>อ่านกติกาเต็ม</summary>';
+    more.appendChild(rulesList());
+    box.appendChild(more);
+  };
 
   document.getElementById('restart').addEventListener('click', function () {
     if (isOver()) {
@@ -327,6 +390,17 @@
   document.getElementById('settings').addEventListener('click', function () {
     duo.openSettings({
       onReset: save,
+      hasProgress: function () {
+        return !isOver() && moveCount() > 0;
+      },
+      onModeChange: function () {
+        S = fresh(0);
+        sel = null;
+        arrivedAt = -1;
+        render();
+        save();
+        cpuTurn();
+      },
       build: function (body) {
         body.appendChild(FG.label('การกิน'));
         body.appendChild(
@@ -357,4 +431,5 @@
   }
   render();
   save();
+  cpuTurn();
 })();

@@ -20,7 +20,11 @@
     dots:
       '<svg viewBox="0 0 34 34" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect class="fg-accent" x="10" y="10" width="4" height="4" rx="1" stroke-width="0"/><path d="M7 7h10v10H7zM17 17h10" fill="none"/><circle cx="7" cy="7" r="2" stroke-width="0"/><circle cx="17" cy="7" r="2" stroke-width="0"/><circle cx="27" cy="7" r="2" stroke-width="0"/><circle cx="7" cy="17" r="2" stroke-width="0"/><circle cx="17" cy="17" r="2" stroke-width="0"/><circle cx="27" cy="17" r="2" stroke-width="0"/><circle cx="7" cy="27" r="2" stroke-width="0"/><circle cx="17" cy="27" r="2" stroke-width="0"/><circle cx="27" cy="27" r="2" stroke-width="0"/></svg>',
     makhos:
-      '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="26" height="26" rx="3"/><path d="M17 4v26M4 17h26" stroke-width="1.4"/><circle class="fg-accent" cx="10.5" cy="23.5" r="3.6"/><circle cx="23.5" cy="10.5" r="3.6"/></svg>'
+      '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="26" height="26" rx="3"/><path d="M17 4v26M4 17h26" stroke-width="1.4"/><circle class="fg-accent" cx="10.5" cy="23.5" r="3.6"/><circle cx="23.5" cy="10.5" r="3.6"/></svg>',
+    othello:
+      '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="28" height="28" rx="3"/><circle cx="12.5" cy="12.5" r="4"/><circle class="fg-accent" cx="21.5" cy="12.5" r="4"/><circle class="fg-accent" cx="12.5" cy="21.5" r="4"/><circle cx="21.5" cy="21.5" r="4"/></svg>',
+    gomoku:
+      '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h26M4 17h26M4 26h26M8 4v26M17 4v26M26 4v26" stroke-width="1.3"/><circle class="fg-accent" cx="8" cy="26" r="3.2"/><circle class="fg-accent" cx="17" cy="17" r="3.2"/><circle class="fg-accent" cx="26" cy="8" r="3.2"/><circle cx="8" cy="8" r="3.2"/><circle cx="26" cy="26" r="3.2"/></svg>'
   };
 
   function glyph(game) {

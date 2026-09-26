@@ -1,0 +1,126 @@
+/* โกโมกุ — กระดานไม้ 15×15 (วางบนจุดตัด), เม็ดแดง/ฟ้า, แตะครั้งแรก = เม็ดจาง + เส้นเล็ง, แตะซ้ำ = วาง */
+:root {
+  --gm-wood: oklch(46% 0.05 70);
+  --gm-line: oklch(30% 0.035 62);
+  --gm-star: oklch(26% 0.03 62);
+}
+
+:root[data-theme="light"] {
+  --gm-wood: oklch(83% 0.065 80);
+  --gm-line: oklch(47% 0.05 62);
+  --gm-star: oklch(38% 0.05 60);
+}
+
+/* กระดานกว้างเกือบชิดขอบจอ ให้จุดตัดใหญ่ที่สุด (375px ≈ 25px ต่อจุด · 320px ≈ 21px) */
+.gm-wrap {
+  margin-inline: calc(var(--space-sm) * -1 + var(--space-3xs));
+}
+
+.gm-board {
+  display: block;
+  width: min(100cqw, 100cqh, 36rem);
+  height: min(100cqw, 100cqh, 36rem);
+  border-radius: var(--radius-md);
+  background: var(--gm-wood);
+  touch-action: manipulation;
+  cursor: pointer;
+}
+
+.gm-board:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 2px;
+}
+
+.gm-grid {
+  stroke: var(--gm-line);
+  stroke-width: 0.045;
+  fill: none;
+}
+
+.gm-starpt {
+  fill: var(--gm-star);
+}
+
+.gm-stone {
+  fill: var(--color-p1);
+  stroke: var(--color-p1-deep);
+  stroke-width: 0.1;
+}
+
+.gm-stone[data-p="1"] {
+  fill: var(--color-p2);
+  stroke: var(--color-p2-deep);
+}
+
+.gm-stone.is-new {
+  animation: gm-place var(--dur-slow) var(--ease-out);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.gm-last {
+  fill: var(--color-ink);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.gm-board.is-over .gm-stone:not(.is-win) {
+  opacity: 0.45;
+}
+
+.gm-win {
+  fill: none;
+  stroke: var(--color-ink);
+  stroke-width: 0.09;
+}
+
+/* เม็ดจาง + เส้นเล็ง (ก่อนยืนยัน) */
+.gm-aim {
+  stroke: var(--color-accent);
+  stroke-width: 0.07;
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.gm-ghost {
+  fill: var(--color-p1);
+  opacity: 0.5;
+  stroke: var(--color-accent);
+  stroke-width: 0.08;
+  pointer-events: none;
+}
+
+.gm-ghost[data-p="1"] {
+  fill: var(--color-p2);
+}
+
+.gm-hint {
+  /* สูงคงที่ 1 บรรทัดเสมอ — ถ้าข้อความเปลี่ยนแล้วกระดานขยับ แตะครั้งที่ 2 จะพลาดจุด */
+  flex: none;
+  height: 1.5em;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  margin: 0;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+}
+
+.gm-hint.is-aim {
+  color: var(--color-accent-text);
+  font-weight: 700;
+}
+
+@keyframes gm-place {
+  from {
+    transform: scale(0.5);
+    opacity: 0.3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gm-stone.is-new {
+    animation: none;
+  }
+}

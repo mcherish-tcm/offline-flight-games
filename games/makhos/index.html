@@ -16,9 +16,11 @@
     <link rel="stylesheet" href="../../shared/base.css" />
     <link rel="stylesheet" href="../../shared/duo.css" />
     <link rel="stylesheet" href="style.css" />
+    <script src="../../shared/games.js" defer></script>
     <script src="../../shared/app.js" data-root="../../" defer></script>
     <script src="../../shared/duo.js" defer></script>
     <script src="engine.js" defer></script>
+    <script src="ai.js" defer></script>
     <script src="game.js" defer></script>
   </head>
   <body class="game">
@@ -26,8 +28,8 @@
       <a class="bar__back" href="../../" data-icon="back">หน้าแรก</a>
       <h1 class="bar__title">หมากฮอสไทย</h1>
       <div class="bar__actions">
-        <button type="button" class="icon-btn" id="rules" data-icon="book" aria-label="กติกา"></button>
-        <button type="button" class="icon-btn" id="settings" data-icon="sliders" aria-label="ตั้งค่า"></button>
+        <button type="button" class="icon-btn" data-howto="makhos" data-icon="info" aria-label="วิธีเล่นและกติกา"></button>
+        <button type="button" class="icon-btn" id="settings" data-icon="sliders" aria-label="ตั้งค่า · เล่นกับคอม"></button>
         <button type="button" class="icon-btn" id="restart" data-icon="restart" aria-label="เริ่มตานี้ใหม่"></button>
       </div>
     </header>

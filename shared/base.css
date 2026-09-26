@@ -406,3 +406,60 @@ html:has(body.game) {
   height: 20px;
   flex: none;
 }
+
+/* ---------- วิธีเล่น (ปุ่ม ⓘ) ---------- */
+
+.howto {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.howto__list {
+  margin: 0;
+  padding-left: 1.2em;
+  display: grid;
+  gap: var(--space-xs);
+  color: var(--color-ink-2);
+}
+
+.howto__list b {
+  color: var(--color-ink);
+}
+
+.howto__more {
+  border-top: var(--rule-hair);
+  padding-top: var(--space-xs);
+}
+
+.howto__more > summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  color: var(--color-accent-text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sheet__body:has(.howto) {
+  max-height: min(62dvh, 32rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* จอแคบมาก (320–359px): ปุ่มหน้าแรกเหลือแต่ลูกศร ให้ชื่อเกมมีที่ + ปุ่มบนแถบไม่ล้นจอ */
+@media (max-width: 359px) {
+  .bar {
+    gap: var(--space-2xs);
+    padding-inline: var(--space-xs);
+  }
+  .bar__back {
+    font-size: 0;
+    padding-right: var(--space-2xs);
+  }
+  .bar__actions {
+    gap: 0;
+  }
+  .icon-btn {
+    width: 44px;
+  }
+}

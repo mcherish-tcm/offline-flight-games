@@ -1,4 +1,4 @@
-/* โอเอ็กซ์ — 2 คนเครื่องเดียว, สลับกันเริ่มทุกตา, ไฮไลต์แถวที่ชนะ, สกอร์สะสม, เล่นต่อจากที่ค้าง */
+/* โอเอ็กซ์ — 2 คนเครื่องเดียว หรือเล่นกับคอม (ai.js), สลับกันเริ่มทุกตา, ไฮไลต์แถวที่ชนะ, สกอร์สะสม, เล่นต่อจากที่ค้าง */
 (function () {
   'use strict';
 
@@ -21,7 +21,8 @@
     board: document.getElementById('wrap'),
     chip: function (p) {
       return MARK[p];
-    }
+    },
+    ai: true
   });
 
   // S = { cells:[-1|0|1 ×9], turn, starter, over: null | { w:0|1, line:[..] } | { draw:true } }
@@ -64,7 +65,12 @@
       if (Date.now() - endedAt > 900) nextRound();
       return;
     }
+    if (duo.isCPU(S.turn)) return; // รอคอมเดิน
     if (S.cells[i] !== -1) return;
+    place(i);
+  }
+
+  function place(i) {
     var p = S.turn;
     S.cells[i] = p;
     FG.buzz(8);
@@ -83,21 +89,40 @@
     if (S.over) {
       endedAt = Date.now();
       setTimeout(showResult, 650);
+    } else {
+      cpuTurn();
     }
+  }
+
+  // ถึงตาคอม → ให้คอมคิดแล้วเดิน
+  function cpuTurn() {
+    if (S.over || !duo.isCPU(S.turn)) return;
+    duo.cpuMove(
+      function () {
+        return OXAI.choose(S.cells, S.turn, duo.level());
+      },
+      function (i) {
+        if (!S.over && duo.isCPU(S.turn) && i >= 0 && S.cells[i] === -1) place(i);
+      }
+    );
   }
 
   function nextRound() {
     FG.closeSheet();
+    duo.cancelCPU();
     S = fresh(1 - S.starter);
     render();
     save();
+    cpuTurn();
   }
 
   function restartRound() {
     FG.closeSheet();
+    duo.cancelCPU();
     S = fresh(S.starter);
     render();
     save();
+    cpuTurn();
   }
 
   function showResult() {
@@ -151,7 +176,18 @@
   });
 
   document.getElementById('settings').addEventListener('click', function () {
-    duo.openSettings({ onReset: save });
+    duo.openSettings({
+      onReset: save,
+      hasProgress: function () {
+        return !S.over && moves() > 0;
+      },
+      onModeChange: function () {
+        S = fresh(0);
+        render();
+        save();
+        cpuTurn();
+      }
+    });
   });
 
   document.addEventListener('keydown', function (e) {
@@ -168,4 +204,5 @@
   }
   render();
   save();
+  cpuTurn();
 })();

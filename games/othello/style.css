@@ -1,0 +1,139 @@
+/* โอเทลโล — กระดานผ้าสักหลาดเขียวหม่น 8×8, เม็ดแดง/ฟ้า (สีผู้เล่นเดียวกับทุกเกม 2 คน), จุดเหลือง = ช่องที่ลงได้ */
+:root {
+  --ot-felt: oklch(40% 0.055 165);
+  --ot-line: oklch(29% 0.045 165);
+}
+
+:root[data-theme="light"] {
+  --ot-felt: oklch(80% 0.06 160);
+  --ot-line: oklch(62% 0.06 162);
+}
+
+.ot-board {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  grid-template-rows: repeat(8, minmax(0, 1fr));
+  gap: 2px;
+  width: min(100cqw, 100cqh, 34rem);
+  height: min(100cqw, 100cqh, 34rem);
+  padding: 2px;
+  border-radius: var(--radius-md);
+  background: var(--ot-line);
+}
+
+.ot-cell {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: var(--ot-felt);
+}
+
+.ot-cell[aria-disabled="true"] {
+  cursor: default;
+}
+
+.ot-disc {
+  --pc: var(--color-p1);
+  --pd: var(--color-p1-deep);
+  position: relative;
+  width: 80%;
+  height: 80%;
+  border-radius: 50%;
+  background: var(--pc);
+  box-shadow: inset 0 0 0 3px var(--pd), 0 2px 3px var(--color-shadow);
+}
+
+.ot-disc[data-p="1"] {
+  --pc: var(--color-p2);
+  --pd: var(--color-p2-deep);
+}
+
+.ot-disc.is-new {
+  animation: ot-place var(--dur-slow) var(--ease-out);
+}
+
+.ot-disc.is-flip {
+  animation: ot-flip 300ms var(--ease-out);
+}
+
+/* เม็ดล่าสุด: จุดเล็กกลางเม็ด */
+.ot-disc.is-last::after {
+  content: "";
+  position: absolute;
+  inset: 38%;
+  border-radius: 50%;
+  background: var(--color-ink);
+  opacity: 0.6;
+}
+
+/* ช่องที่ลงได้ */
+.ot-cell.is-legal::after {
+  content: "";
+  width: 30%;
+  height: 30%;
+  border-radius: 50%;
+  background: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--ot-line);
+}
+
+.ot-cell.is-legal:active {
+  background: var(--color-accent-wash);
+}
+
+.ot-board.is-over .ot-disc:not(.is-lead) {
+  opacity: 0.55;
+}
+
+.ot-hint {
+  /* สูงคงที่ 1 บรรทัดเสมอ กันกระดานขยับเวลาข้อความเปลี่ยน */
+  flex: none;
+  height: 1.5em;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  margin: 0;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+}
+
+.ot-hint.is-pass {
+  color: var(--color-accent-text);
+  font-weight: 700;
+}
+
+@keyframes ot-place {
+  from {
+    transform: scale(0.5);
+    opacity: 0.3;
+  }
+}
+
+@keyframes ot-flip {
+  0% {
+    transform: scaleX(1);
+  }
+  45% {
+    transform: scaleX(0.08);
+  }
+  100% {
+    transform: scaleX(1);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ot-cell.is-legal:hover {
+    background: var(--color-accent-wash);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ot-disc.is-new,
+  .ot-disc.is-flip {
+    animation: none;
+  }
+}

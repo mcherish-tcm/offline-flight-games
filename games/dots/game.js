@@ -1,4 +1,4 @@
-/* ลากเส้นปิดกล่อง — 3×3 / 4×4 / 5×5 กล่อง, แตะใกล้ขอบ (กดค้างแล้วเลื่อนนิ้วเลือกเส้นได้), ปิดกล่อง = ได้แต้ม + เล่นต่อ */
+/* ลากเส้นปิดกล่อง — 2 คน หรือเล่นกับคอม (ai.js), 3×3 / 4×4 / 5×5 กล่อง, แตะใกล้ขอบ (กดค้างแล้วเลื่อนนิ้วเลือกเส้นได้), ปิดกล่อง = ได้แต้ม + เล่นต่อ */
 (function () {
   'use strict';
 
@@ -19,7 +19,8 @@
     board: document.getElementById('wrap'),
     chip: function (p) {
       return CHIP[p];
-    }
+    },
+    ai: true
   });
 
   // S = { n, lines:[-1|0|1], boxes:[-1|0|1], turn, starter, last, over: null | { w } | { draw:true } }
@@ -107,30 +108,49 @@
       setTimeout(showResult, 700);
     } else if (!closed) {
       S.turn = 1 - p;
-    } else {
+    } else if (!duo.isCPU(p)) {
       FG.toast(duo.name(p) + 'ปิดได้ ' + closed + ' กล่อง — เล่นต่ออีกตา', 1400);
     }
     render();
     save();
+    if (!S.over) cpuTurn(closed > 0);
+  }
+
+  // ถึงตาคอม → คิดแล้วลากเส้น (ปิดกล่องได้ = ลากต่อทันทีแบบเร็วขึ้น)
+  function cpuTurn(chain) {
+    if (S.over || !duo.isCPU(S.turn)) return;
+    duo.cpuMove(
+      function () {
+        return DotsAI.choose(S.n, S.lines, duo.level());
+      },
+      function (k) {
+        if (!S.over && duo.isCPU(S.turn) && k >= 0 && S.lines[k] === -1) play(k);
+      },
+      chain ? { min: 320 } : null
+    );
   }
 
   function nextRound() {
     FG.closeSheet();
+    duo.cancelCPU();
     S = fresh(FG.store.get(SIZE_KEY, 4), 1 - S.starter);
     render();
     save();
+    cpuTurn();
   }
 
   function restartRound() {
     FG.closeSheet();
+    duo.cancelCPU();
     S = fresh(FG.store.get(SIZE_KEY, 4), S.starter);
     render();
     save();
+    cpuTurn();
   }
 
   function showResult() {
     if (!S.over) return;
-    var txt = 'แดง ' + points(0) + ' กล่อง · ฟ้า ' + points(1) + ' กล่อง';
+    var txt = duo.name(0) + ' ' + points(0) + ' กล่อง · ' + duo.name(1) + ' ' + points(1) + ' กล่อง';
     if (S.over.draw) duo.showResult({ title: 'เสมอ', text: txt, onNext: nextRound });
     else duo.showResult({ title: duo.name(S.over.w) + 'ชนะ!', text: txt, onNext: nextRound, faceTo: S.over.w });
   }
@@ -222,6 +242,7 @@
       if (Date.now() - endedAt > 900) nextRound();
       return;
     }
+    if (duo.isCPU(S.turn)) return; // รอคอมเดิน
     pointerId = e.pointerId;
     try {
       svg.setPointerCapture(e.pointerId);
@@ -237,7 +258,7 @@
     pointerId = null;
     var k = nearest(e);
     cand = -1;
-    if (k !== -1) play(k);
+    if (k !== -1 && !duo.isCPU(S.turn)) play(k);
     else render();
   });
   svg.addEventListener('pointercancel', function (e) {
@@ -266,6 +287,16 @@
   document.getElementById('settings').addEventListener('click', function () {
     duo.openSettings({
       onReset: save,
+      hasProgress: function () {
+        return !S.over && drawn() > 0;
+      },
+      onModeChange: function () {
+        S = fresh(FG.store.get(SIZE_KEY, 4), 0);
+        cand = -1;
+        render();
+        save();
+        cpuTurn();
+      },
       build: function (body) {
         body.appendChild(FG.label('ขนาดกระดาน (ใช้ตั้งแต่ตาใหม่)'));
         body.appendChild(
@@ -277,9 +308,11 @@
             function (v) {
               FG.store.set(SIZE_KEY, v);
               if (S.over || drawn() === 0) {
+                duo.cancelCPU();
                 S = fresh(v, S.starter);
                 render();
                 save();
+                cpuTurn();
               } else {
                 FG.toast('ขนาด ' + v + '×' + v + ' จะเริ่มตาหน้า');
               }
@@ -299,4 +332,5 @@
   }
   render();
   save();
+  cpuTurn();
 })();

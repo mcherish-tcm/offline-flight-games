@@ -54,7 +54,8 @@
     sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M20 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
     wand: '<path d="M4 20L15 9"/><path d="M17 3v4M15 5h4M20 10v3M18.5 11.5h3"/>',
     download: '<path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/>',
-    book: '<path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z"/><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5z"/>'
+    book: '<path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v16H5.5A1.5 1.5 0 0 1 4 18.5z"/><path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v16h5.5a1.5 1.5 0 0 0 1.5-1.5z"/>',
+    info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><path d="M12 7.6v.01" stroke-width="2.6"/>'
   };
 
   function icon(name) {
@@ -292,6 +293,42 @@
     } catch (e) {}
   }
 
+  /* ---------- วิธีเล่น (ปุ่ม ⓘ บนแถบหัวของทุกเกม) ----------
+   * ในหน้าเกม: <button type="button" class="icon-btn" data-howto="<id เกม>" data-icon="info" aria-label="วิธีเล่น"></button>
+   * ข้อความอยู่ที่ howto ของเกมนั้นใน shared/games.js (หน้าเกมต้องโหลด games.js ด้วย)
+   * เกมเพิ่มเนื้อหาท้ายหน้าต่างได้: FG.howtoExtra = function (container) { ... }
+   */
+  function howto(id) {
+    var list = typeof self !== 'undefined' && self.FG_GAMES ? self.FG_GAMES : [];
+    var game = null;
+    for (var k = 0; k < list.length; k++) if (list[k].id === id) game = list[k];
+    var body = document.createElement('div');
+    body.className = 'howto';
+    var ul = document.createElement('ul');
+    ul.className = 'howto__list';
+    ul.innerHTML = ((game && game.howto) || ['ยังไม่มีคำอธิบายของเกมนี้'])
+      .map(function (t) {
+        return '<li>' + t + '</li>';
+      })
+      .join('');
+    body.appendChild(ul);
+    if (typeof window.FG.howtoExtra === 'function') window.FG.howtoExtra(body);
+    return sheet({
+      // ชื่อไทยต่อกันได้เลย ("วิธีเล่นซูโดกุ") · ชื่อที่ขึ้นต้นด้วยเลข/อังกฤษ เว้นวรรค ("วิธีเล่น 2048")
+      title: 'วิธีเล่น' + (game ? (/^[฀-๿]/.test(game.title) ? '' : ' ') + game.title : ''),
+      body: body,
+      actions: [{ label: 'เข้าใจแล้ว', primary: true }]
+    });
+  }
+
+  function wireHowto(root) {
+    (root || document).querySelectorAll('[data-howto]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        howto(el.getAttribute('data-howto'));
+      });
+    });
+  }
+
   /* ---------- service worker + update prompt ---------- */
   var userAskedReload = false;
   var updateBar = null;
@@ -381,6 +418,7 @@
   /* ---------- boot ---------- */
   applyTheme(getTheme());
   fillIcons(document);
+  wireHowto(document);
   document.addEventListener('gesturestart', function (e) {
     e.preventDefault();
   });
@@ -405,6 +443,8 @@
     onVisibility: onVisibility,
     buzz: buzz,
     offlineStatus: offlineStatus,
+    howto: howto,
+    howtoExtra: null,
     isSheetOpen: function () {
       return !!openSheet;
     }
