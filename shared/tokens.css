@@ -1,0 +1,114 @@
+/* Hallmark · macrostructure: App Shell (row catalogue hub + full-bleed tool pages) · tone: utilitarian-playful, night cabin · anchor hue: amber 75 (reading light)
+ * theme: custom (vibe: "night cabin, reading light, calm, tactile")
+ * paper oklch(17% 0.018 255) · accent oklch(80% 0.13 75) · display/body: system Thai sans (Noto Sans Thai / Leelawadee UI)
+ * axes: dark / rounded-system-sans / warm
+ * Hallmark · pre-emit critique: P4 H4 E4 S4 R5 V4
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* surfaces — dark (default, plane cabin) */
+  --color-paper: oklch(17% 0.018 255);
+  --color-paper-2: oklch(21.5% 0.02 255);
+  --color-paper-3: oklch(27% 0.022 255);
+  --color-rule: oklch(33% 0.02 255);
+  --color-ink: oklch(93% 0.012 85);
+  --color-ink-2: oklch(76% 0.015 255);
+  --color-ink-3: oklch(60% 0.015 255);
+
+  /* accent — reading-light amber */
+  --color-accent: oklch(80% 0.13 75);
+  --color-accent-strong: oklch(86% 0.12 80);
+  --color-accent-ink: oklch(22% 0.03 70);
+  --color-accent-text: oklch(82% 0.12 75);
+  --color-accent-wash: oklch(80% 0.13 75 / 0.14);
+
+  --color-ok: oklch(78% 0.12 155);
+  --color-ok-wash: oklch(78% 0.12 155 / 0.16);
+  --color-danger: oklch(70% 0.16 25);
+  --color-danger-wash: oklch(70% 0.16 25 / 0.2);
+  --color-focus: oklch(86% 0.12 80);
+  --color-scrim: oklch(8% 0.01 255 / 0.62);
+  --color-shadow: oklch(5% 0.01 255 / 0.45);
+
+  /* playing cards (Solitaire) */
+  --color-card-face: oklch(95% 0.01 85);
+  --color-card-ink: oklch(23% 0.02 255);
+  --color-card-red: oklch(54% 0.19 25);
+  --color-card-back: oklch(42% 0.08 250);
+  --color-card-back-2: oklch(48% 0.09 250);
+  --color-card-edge: oklch(10% 0.01 255 / 0.35);
+
+  /* type — system fonts that render Thai well, no downloads */
+  --font-body: "Noto Sans Thai UI", "Noto Sans Thai", "Leelawadee UI", "Sarabun", "Thonburi", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: var(--font-body);
+  --font-num: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+
+  /* 4pt space scale */
+  --space-3xs: 0.125rem;
+  --space-2xs: 0.25rem;
+  --space-xs: 0.5rem;
+  --space-sm: 0.75rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-pill: 999px;
+
+  --rule-hair: 1px solid var(--color-rule);
+
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in: cubic-bezier(0.55, 0, 1, 0.45);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-fast: 110ms;
+  --dur-med: 170ms;
+  --dur-slow: 260ms;
+
+  --tap: 48px;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-paper: oklch(96% 0.008 85);
+  --color-paper-2: oklch(99% 0.004 85);
+  --color-paper-3: oklch(91% 0.012 85);
+  --color-rule: oklch(84% 0.012 85);
+  --color-ink: oklch(24% 0.02 255);
+  --color-ink-2: oklch(42% 0.02 255);
+  --color-ink-3: oklch(55% 0.018 255);
+  --color-accent: oklch(78% 0.14 72);
+  --color-accent-strong: oklch(72% 0.15 68);
+  --color-accent-ink: oklch(22% 0.03 70);
+  --color-accent-text: oklch(50% 0.13 60);
+  --color-accent-wash: oklch(78% 0.14 72 / 0.22);
+  --color-ok: oklch(52% 0.13 155);
+  --color-ok-wash: oklch(60% 0.13 155 / 0.16);
+  --color-danger: oklch(55% 0.19 25);
+  --color-danger-wash: oklch(60% 0.19 25 / 0.16);
+  --color-focus: oklch(55% 0.15 60);
+  --color-scrim: oklch(20% 0.02 255 / 0.4);
+  --color-shadow: oklch(20% 0.02 255 / 0.18);
+  --color-card-face: oklch(99.5% 0.003 85);
+  --color-card-edge: oklch(20% 0.02 255 / 0.28);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --dur-fast: 1ms;
+    --dur-med: 1ms;
+    --dur-slow: 120ms;
+  }
+}

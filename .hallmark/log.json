@@ -1,0 +1,11 @@
+[
+  {
+    "date": "2026-09-26",
+    "macrostructure": "App Shell (row catalogue hub + full-bleed tool pages)",
+    "theme": "custom",
+    "theme_axes": "dark / rounded-system-sans / warm",
+    "vibe": "night cabin, reading light, calm, tactile",
+    "enrichment": "none (code-drawn SVG glyphs only)",
+    "brief": "เกมบนเครื่องบิน · offline PWA game collection (2048, Sudoku, Minesweeper, Solitaire, Snake)"
+  }
+]

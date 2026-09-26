@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f1622" />
+    <meta name="description" content="เกมเล่นคนเดียวแบบไม่ต้องใช้อินเทอร์เน็ต" />
+    <title>เกมบนเครื่องบิน</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icons/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="icons/icon-192.png" />
+    <script>
+      try {
+        if (localStorage.getItem('ffg:theme') === '"light"') document.documentElement.setAttribute('data-theme', 'light');
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="shared/tokens.css" />
+    <link rel="stylesheet" href="shared/base.css" />
+    <link rel="stylesheet" href="shared/hub.css" />
+    <script src="shared/games.js" defer></script>
+    <script src="shared/app.js" data-root="./" defer></script>
+    <script src="shared/hub.js" defer></script>
+  </head>
+  <body class="hub">
+    <header class="hub__head">
+      <h1 class="hub__title">เกมบนเครื่องบิน</h1>
+      <p class="hub__sub">เล่นได้ทั้งไฟลต์ ไม่ต้องใช้เน็ต</p>
+      <button type="button" class="offline" id="offline" data-state="checking" aria-live="polite">
+        <span class="offline__dot" aria-hidden="true"></span>
+        <span class="offline__text" id="offline-text">กำลังตรวจว่าพร้อมเล่นออฟไลน์ไหม…</span>
+      </button>
+    </header>
+
+    <main class="hub__main">
+      <section class="shelf" aria-labelledby="solo-h">
+        <h2 class="shelf__title" id="solo-h">เล่นคนเดียว</h2>
+        <ul class="shelf__list" id="solo-list"></ul>
+      </section>
+
+      <section class="shelf" aria-labelledby="duo-h">
+        <h2 class="shelf__title" id="duo-h">เล่น 2 คน</h2>
+        <ul class="shelf__list" id="duo-list"></ul>
+      </section>
+    </main>
+
+    <footer class="hub__foot">
+      <button type="button" class="btn btn--ghost" id="theme-btn"></button>
+      <button type="button" class="btn btn--ghost" id="install-btn" data-icon="download" hidden>ติดตั้งลงเครื่อง</button>
+      <span class="hub__ver" id="ver"></span>
+    </footer>
+  </body>
+</html>

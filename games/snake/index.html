@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f1622" />
+    <title>งู · เกมบนเครื่องบิน</title>
+    <link rel="manifest" href="../../manifest.webmanifest" />
+    <link rel="icon" href="../../icons/icon.svg" type="image/svg+xml" />
+    <script>
+      try {
+        if (localStorage.getItem('ffg:theme') === '"light"') document.documentElement.setAttribute('data-theme', 'light');
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="../../shared/tokens.css" />
+    <link rel="stylesheet" href="../../shared/base.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="../../shared/app.js" data-root="../../" defer></script>
+    <script src="game.js" defer></script>
+  </head>
+  <body class="game">
+    <header class="bar">
+      <a class="bar__back" href="../../" data-icon="back">หน้าแรก</a>
+      <h1 class="bar__title">งู</h1>
+      <div class="bar__actions">
+        <button type="button" class="icon-btn" id="pause" data-icon="pause" aria-label="หยุดชั่วคราว" disabled></button>
+      </div>
+    </header>
+    <main class="stage">
+      <div class="stats">
+        <div class="stat"><span class="stat__label">คะแนน</span><span class="stat__value" id="score">0</span></div>
+        <div class="stat"><span class="stat__label">สถิติ (<span id="speed-name">กลาง</span>)</span><span class="stat__value" id="best">0</span></div>
+      </div>
+      <div class="sn-wrap" id="wrap">
+        <canvas class="sn-canvas" id="canvas" aria-label="สนามงู ปัดนิ้วหรือกดปุ่มลูกศรเพื่อเลี้ยว"></canvas>
+        <div class="sn-overlay" id="overlay">
+          <p class="sn-overlay__title" id="ov-title">งู</p>
+          <p class="sn-overlay__text" id="ov-text">ปัดนิ้วบนสนาม หรือกดปุ่มลูกศรด้านล่าง</p>
+          <div class="sn-overlay__speed" id="ov-speed"></div>
+          <button type="button" class="btn btn--primary" id="ov-go" data-icon="play">เริ่มเล่น</button>
+        </div>
+      </div>
+      <div class="sn-pad" aria-label="ปุ่มบังคับทิศ">
+        <button type="button" class="sn-key sn-key--up" data-dir="up" data-icon="up" aria-label="ขึ้น"></button>
+        <button type="button" class="sn-key sn-key--left" data-dir="left" data-icon="left" aria-label="ซ้าย"></button>
+        <button type="button" class="sn-key sn-key--right" data-dir="right" data-icon="right" aria-label="ขวา"></button>
+        <button type="button" class="sn-key sn-key--down" data-dir="down" data-icon="down" aria-label="ลง"></button>
+      </div>
+    </main>
+  </body>
+</html>

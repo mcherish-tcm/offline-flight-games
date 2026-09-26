@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f1622" />
+    <title>2048 · เกมบนเครื่องบิน</title>
+    <link rel="manifest" href="../../manifest.webmanifest" />
+    <link rel="icon" href="../../icons/icon.svg" type="image/svg+xml" />
+    <script>
+      try {
+        if (localStorage.getItem('ffg:theme') === '"light"') document.documentElement.setAttribute('data-theme', 'light');
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="../../shared/tokens.css" />
+    <link rel="stylesheet" href="../../shared/base.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="../../shared/app.js" data-root="../../" defer></script>
+    <script src="game.js" defer></script>
+  </head>
+  <body class="game">
+    <header class="bar">
+      <a class="bar__back" href="../../" data-icon="back">หน้าแรก</a>
+      <h1 class="bar__title">2048</h1>
+      <div class="bar__actions">
+        <button type="button" class="icon-btn" id="undo" data-icon="undo" aria-label="ย้อน 1 ตา" disabled></button>
+        <button type="button" class="icon-btn" id="restart" data-icon="restart" aria-label="เริ่มเกมใหม่"></button>
+      </div>
+    </header>
+    <main class="stage" id="stage">
+      <div class="stats">
+        <div class="stat"><span class="stat__label">คะแนน</span><span class="stat__value" id="score">0</span></div>
+        <div class="stat"><span class="stat__label">สถิติ</span><span class="stat__value" id="best">0</span></div>
+      </div>
+      <div class="board-wrap">
+        <div class="board" id="board" role="application" aria-label="กระดาน 2048 ปัดนิ้วหรือกดลูกศรเพื่อเลื่อน">
+          <div class="board__cells" aria-hidden="true"></div>
+        </div>
+      </div>
+      <p class="hint">ปัดนิ้วขึ้น ลง ซ้าย ขวา · เลขเหมือนกันชนกันจะรวมเป็นเลขใหม่</p>
+    </main>
+  </body>
+</html>

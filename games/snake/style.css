@@ -1,0 +1,128 @@
+/* Snake — canvas colours are read from these tokens at draw time */
+:root {
+  --sn-field: var(--color-paper-2);
+  --sn-dot: var(--color-paper-3);
+  --sn-body: oklch(72% 0.12 155);
+  --sn-head: oklch(84% 0.13 150);
+  --sn-eye: var(--color-paper);
+  --sn-food: var(--color-accent);
+}
+
+:root[data-theme="light"] {
+  --sn-body: oklch(56% 0.13 155);
+  --sn-head: oklch(46% 0.13 155);
+  --sn-eye: oklch(99% 0.004 85);
+}
+
+.stage {
+  gap: var(--space-xs);
+}
+
+.sn-wrap {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  touch-action: none;
+}
+
+.sn-canvas {
+  display: block;
+  border-radius: var(--radius-md);
+  background: var(--sn-field);
+  touch-action: none;
+}
+
+.sn-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-lg);
+  text-align: center;
+  background: var(--color-scrim);
+  border-radius: var(--radius-md);
+}
+
+.sn-overlay[hidden] {
+  display: none;
+}
+
+.sn-overlay__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--color-ink);
+}
+
+.sn-overlay__text {
+  margin: 0;
+  max-width: 20rem;
+  color: var(--color-ink-2);
+}
+
+.sn-overlay__speed {
+  width: min(100%, 18rem);
+}
+
+.sn-overlay .btn {
+  min-width: 12rem;
+  min-height: 52px;
+}
+
+.sn-overlay .btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.sn-pad {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(3, 68px);
+  grid-template-rows: repeat(3, 56px);
+  grid-template-areas:
+    ". up ."
+    "left . right"
+    ". down .";
+  gap: var(--space-2xs);
+  justify-content: center;
+}
+
+.sn-key {
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: var(--rule-hair);
+  border-radius: var(--radius-md);
+  background: var(--color-paper-2);
+  color: var(--color-ink);
+}
+
+.sn-key svg {
+  width: 30px;
+  height: 30px;
+}
+
+.sn-key:active,
+.sn-key.is-hit {
+  background: var(--color-accent-wash);
+  border-color: var(--color-accent);
+}
+
+.sn-key--up { grid-area: up; }
+.sn-key--left { grid-area: left; }
+.sn-key--right { grid-area: right; }
+.sn-key--down { grid-area: down; }
+
+@media (max-height: 640px) {
+  .sn-pad {
+    grid-template-columns: repeat(3, 60px);
+    grid-template-rows: repeat(3, 44px);
+  }
+}
