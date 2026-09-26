@@ -40,6 +40,16 @@
   --color-card-back-2: oklch(48% 0.09 250);
   --color-card-edge: oklch(10% 0.01 255 / 0.35);
 
+  /* two-player games — แดง (player 1, bottom) · ฟ้า (player 2, top) */
+  --color-p1: oklch(70% 0.17 27);
+  --color-p1-deep: oklch(56% 0.17 27);
+  --color-p1-wash: oklch(70% 0.17 27 / 0.16);
+  --color-p1-ink: oklch(20% 0.05 27);
+  --color-p2: oklch(77% 0.12 232);
+  --color-p2-deep: oklch(60% 0.12 238);
+  --color-p2-wash: oklch(77% 0.12 232 / 0.16);
+  --color-p2-ink: oklch(20% 0.05 240);
+
   /* type — system fonts that render Thai well, no downloads */
   --font-body: "Noto Sans Thai UI", "Noto Sans Thai", "Leelawadee UI", "Sarabun", "Thonburi", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-display: var(--font-body);
@@ -103,6 +113,14 @@
   --color-shadow: oklch(20% 0.02 255 / 0.18);
   --color-card-face: oklch(99.5% 0.003 85);
   --color-card-edge: oklch(20% 0.02 255 / 0.28);
+  --color-p1: oklch(58% 0.19 27);
+  --color-p1-deep: oklch(48% 0.18 27);
+  --color-p1-wash: oklch(58% 0.19 27 / 0.13);
+  --color-p1-ink: oklch(98% 0.01 27);
+  --color-p2: oklch(56% 0.14 245);
+  --color-p2-deep: oklch(46% 0.13 250);
+  --color-p2-wash: oklch(56% 0.14 245 / 0.13);
+  --color-p2-ink: oklch(98% 0.01 245);
 }
 
 @media (prefers-reduced-motion: reduce) {

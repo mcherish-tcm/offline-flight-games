@@ -12,7 +12,15 @@
     solitaire:
       '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="4" y="7" width="15" height="22" rx="2.5" transform="rotate(-10 11 18)"/><rect x="14" y="5" width="15" height="22" rx="2.5"/><path class="fg-accent" d="M21.5 12.5c-1.6-2-4.2-.6-3.4 1.5.6 1.4 3.4 3.5 3.4 3.5s2.8-2.1 3.4-3.5c.8-2.1-1.8-3.5-3.4-1.5z"/></svg>',
     snake:
-      '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 27h10V17h12V7h-8"/><circle class="fg-accent" cx="12" cy="8" r="2.4" stroke-width="0"/></svg>'
+      '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 27h10V17h12V7h-8"/><circle class="fg-accent" cx="12" cy="8" r="2.4" stroke-width="0"/></svg>',
+    ox:
+      '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12.3 4v26M21.7 4v26M4 12.3h26M4 21.7h26" stroke-width="1.4"/><path d="M5.6 5.6l4.3 4.3M9.9 5.6l-4.3 4.3"/><circle class="fg-accent-line" cx="17" cy="17" r="2.8"/></svg>',
+    connect4:
+      '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="6" width="28" height="24" rx="4"/><circle cx="10" cy="13" r="2.6"/><circle cx="17" cy="13" r="2.6"/><circle cx="24" cy="13" r="2.6"/><circle cx="10" cy="22.5" r="2.6"/><circle class="fg-accent" cx="17" cy="22.5" r="2.6"/><circle cx="24" cy="22.5" r="2.6"/></svg>',
+    dots:
+      '<svg viewBox="0 0 34 34" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect class="fg-accent" x="10" y="10" width="4" height="4" rx="1" stroke-width="0"/><path d="M7 7h10v10H7zM17 17h10" fill="none"/><circle cx="7" cy="7" r="2" stroke-width="0"/><circle cx="17" cy="7" r="2" stroke-width="0"/><circle cx="27" cy="7" r="2" stroke-width="0"/><circle cx="7" cy="17" r="2" stroke-width="0"/><circle cx="17" cy="17" r="2" stroke-width="0"/><circle cx="27" cy="17" r="2" stroke-width="0"/><circle cx="7" cy="27" r="2" stroke-width="0"/><circle cx="17" cy="27" r="2" stroke-width="0"/><circle cx="27" cy="27" r="2" stroke-width="0"/></svg>',
+    makhos:
+      '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="26" height="26" rx="3"/><path d="M17 4v26M4 17h26" stroke-width="1.4"/><circle class="fg-accent" cx="10.5" cy="23.5" r="3.6"/><circle cx="23.5" cy="10.5" r="3.6"/></svg>'
   };
 
   function glyph(game) {

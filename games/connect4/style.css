@@ -1,0 +1,100 @@
+/* หยอดเหรียญเรียง 4 — 7 แถวตั้ง × 6 แถวนอน */
+
+.c4-board {
+  --gap: clamp(3px, 1.2cqw, 7px);
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: var(--gap);
+  width: min(100cqw, calc(100cqh * 7 / 6), 32rem);
+  aspect-ratio: 7 / 6;
+  padding: var(--gap);
+  border-radius: var(--radius-lg);
+  background: var(--color-paper-3);
+}
+
+.c4-col {
+  display: grid;
+  grid-template-rows: repeat(6, minmax(0, 1fr));
+  gap: var(--gap);
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  overflow: hidden;
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+
+.c4-col:active:not(:disabled),
+.c4-col.is-pressed {
+  background: var(--color-rule);
+}
+
+.c4-col:disabled {
+  cursor: default;
+  opacity: 1;
+}
+
+.c4-slot {
+  position: relative;
+  border-radius: 50%;
+  background: var(--color-paper);
+  box-shadow: inset 0 2px 3px var(--color-shadow);
+}
+
+.c4-disc {
+  --from: 1;
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--color-p1);
+  box-shadow: inset 0 0 0 5px var(--color-p1-deep);
+}
+
+.c4-disc[data-p="1"] {
+  background: var(--color-p2);
+  box-shadow: inset 0 0 0 5px var(--color-p2-deep);
+}
+
+.c4-disc.is-drop {
+  animation: c4-drop calc(120ms + var(--from) * 38ms) var(--ease-in) both;
+}
+
+@keyframes c4-drop {
+  from {
+    transform: translateY(calc(var(--from) * -118%));
+  }
+}
+
+.c4-board.is-over .c4-disc:not(.is-win) {
+  opacity: 0.4;
+}
+
+.c4-disc.is-win::after {
+  content: "";
+  position: absolute;
+  inset: 26%;
+  border: 4px solid var(--color-ink);
+  border-radius: 50%;
+}
+
+.c4-disc.is-last:not(.is-win)::after {
+  content: "";
+  position: absolute;
+  inset: 38%;
+  border-radius: 50%;
+  background: var(--color-ink);
+  opacity: 0.55;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .c4-col:hover:not(:disabled) {
+    background: var(--color-rule);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .c4-disc.is-drop {
+    animation: none;
+  }
+}

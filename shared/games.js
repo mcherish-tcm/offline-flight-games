@@ -17,6 +17,8 @@
     'shared/games.js',
     'shared/hub.css',
     'shared/hub.js',
+    'shared/duo.css',
+    'shared/duo.js',
     'icons/icon.svg',
     'icons/icon-192.png',
     'icons/icon-512.png',
@@ -30,7 +32,17 @@
     { id: 'sudoku', title: 'ซูโดกุ', blurb: 'เติมเลข 1–9 ไม่ให้ซ้ำ มี 3 ระดับ', players: 1 },
     { id: 'minesweeper', title: 'หาระเบิด', blurb: 'เปิดช่องให้หมดโดยไม่โดนระเบิด', players: 1 },
     { id: 'solitaire', title: 'โซลิแทร์', blurb: 'เรียงไพ่ขึ้นกองตามดอก จาก A ถึง K', players: 1 },
-    { id: 'snake', title: 'งู', blurb: 'กินอาหารให้งูยาวที่สุด อย่าชนกำแพง', players: 1 }
+    { id: 'snake', title: 'งู', blurb: 'กินอาหารให้งูยาวที่สุด อย่าชนกำแพง', players: 1 },
+    { id: 'ox', title: 'โอเอ็กซ์', blurb: 'เรียง X หรือ O ให้ครบ 3 ช่องก่อน', players: 2 },
+    { id: 'connect4', title: 'หยอดเหรียญเรียง 4', blurb: 'หยอดเหรียญให้เรียงครบ 4 ก่อนอีกฝ่าย', players: 2 },
+    { id: 'dots', title: 'ลากเส้นปิดกล่อง', blurb: 'ผลัดกันลากเส้น ปิดกล่องได้มากสุดชนะ', players: 2 },
+    {
+      id: 'makhos',
+      title: 'หมากฮอสไทย',
+      blurb: 'กติกาไทย บังคับกิน ฮอสลงติดตัวที่กิน',
+      players: 2,
+      files: ['index.html', 'style.css', 'engine.js', 'game.js']
+    }
   ];
 
   var DEFAULT_GAME_FILES = ['index.html', 'style.css', 'game.js'];

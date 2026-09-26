@@ -157,6 +157,11 @@ body.hub {
   stroke: var(--color-accent);
 }
 
+.glyph .fg-accent-line {
+  fill: none;
+  stroke: var(--color-accent);
+}
+
 .glyph__letter {
   font-size: var(--text-xl);
   font-weight: 800;

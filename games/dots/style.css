@@ -1,0 +1,105 @@
+/* ลากเส้นปิดกล่อง — วาดด้วย SVG, แตะที่ไหนในกล่องก็ได้ เลือกเส้นที่ใกล้นิ้วที่สุด */
+
+.dots-board {
+  width: min(100cqw, 100cqh, 30rem);
+  height: min(100cqw, 100cqh, 30rem);
+  border-radius: var(--radius-lg);
+  background: var(--color-paper-2);
+  touch-action: none;
+  cursor: pointer;
+}
+
+.dots-guide {
+  stroke: var(--color-rule);
+  stroke-width: 2px;
+  stroke-dasharray: 3 5;
+  vector-effect: non-scaling-stroke;
+}
+
+.dots-line {
+  stroke-width: 7px;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.dots-line[data-p="0"] {
+  stroke: var(--color-p1);
+}
+
+.dots-line[data-p="1"] {
+  stroke: var(--color-p2);
+}
+
+.dots-box__mark[data-p="0"] {
+  fill: var(--color-p1);
+}
+
+.dots-box__mark[data-p="1"] {
+  fill: var(--color-p2);
+}
+
+.dots-last {
+  stroke: var(--color-accent);
+  stroke-width: 15px;
+  stroke-linecap: round;
+  stroke-opacity: 0.45;
+  vector-effect: non-scaling-stroke;
+}
+
+.dots-cand {
+  stroke-width: 7px;
+  stroke-linecap: round;
+  stroke-opacity: 0.55;
+  vector-effect: non-scaling-stroke;
+}
+
+.dots-cand[data-p="0"] {
+  stroke: var(--color-p1);
+}
+
+.dots-cand[data-p="1"] {
+  stroke: var(--color-p2);
+}
+
+.dots-box[data-p="0"] {
+  fill: var(--color-p1-wash);
+}
+
+.dots-box[data-p="1"] {
+  fill: var(--color-p2-wash);
+}
+
+.dots-box__mark {
+  stroke: none;
+}
+
+.dots-box__mark.is-new {
+  animation: box-in var(--dur-slow) var(--ease-out);
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.dots-dot {
+  fill: var(--color-ink);
+}
+
+@keyframes box-in {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+
+.dots-hint {
+  flex: none;
+  margin: 0;
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+}
+
+@media (max-height: 620px) {
+  .dots-hint {
+    display: none;
+  }
+}

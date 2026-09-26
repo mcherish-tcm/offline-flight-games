@@ -1,0 +1,74 @@
+/* OX — 3×3, X = แดง, O = ฟ้า */
+
+.ox-board {
+  --size: min(100cqw, 100cqh, 26rem);
+  --gap: 8px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  gap: var(--gap);
+  width: var(--size);
+  height: var(--size);
+  padding: var(--gap);
+  border-radius: var(--radius-lg);
+  background: var(--color-paper-2);
+}
+
+.ox-cell {
+  display: grid;
+  place-items: center;
+  padding: 16%;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--color-paper-3);
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+
+.ox-cell:active:not([aria-disabled="true"]) {
+  background: var(--color-rule);
+}
+
+.ox-cell[aria-disabled="true"] {
+  cursor: default;
+}
+
+.ox-cell svg {
+  width: 100%;
+  height: 100%;
+  animation: mark-in var(--dur-med) var(--ease-out);
+}
+
+.ox-cell[data-p="0"] {
+  color: var(--color-p1);
+}
+
+.ox-cell[data-p="1"] {
+  color: var(--color-p2);
+}
+
+.ox-cell.is-win[data-p="0"] {
+  background: var(--color-p1);
+  color: var(--color-p1-ink);
+}
+
+.ox-cell.is-win[data-p="1"] {
+  background: var(--color-p2);
+  color: var(--color-p2-ink);
+}
+
+.ox-board.is-over .ox-cell:not(.is-win) svg {
+  opacity: 0.45;
+}
+
+@keyframes mark-in {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ox-cell:hover:not([aria-disabled="true"]) {
+    background: var(--color-rule);
+  }
+}
