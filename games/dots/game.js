@@ -133,7 +133,8 @@
   function nextRound() {
     FG.closeSheet();
     duo.cancelCPU();
-    S = fresh(FG.store.get(SIZE_KEY, 4), 1 - S.starter);
+    duo.newRound();
+    S = fresh(FG.store.get(SIZE_KEY, 4),1 - S.starter);
     render();
     save();
     cpuTurn();
@@ -142,7 +143,8 @@
   function restartRound() {
     FG.closeSheet();
     duo.cancelCPU();
-    S = fresh(FG.store.get(SIZE_KEY, 4), S.starter);
+    duo.newRound();
+    S = fresh(FG.store.get(SIZE_KEY, 4),S.starter);
     render();
     save();
     cpuTurn();
@@ -284,44 +286,48 @@
     });
   });
 
-  document.getElementById('settings').addEventListener('click', function () {
+  // ⚙️ (ปุ่มเฟืองบนแถบหัว — app.js ผูกปุ่มให้แล้ว) · ขนาดกระดานใช้ตั้งแต่ตาใหม่
+  FG.openSettings = function () {
+    var size = FG.store.get(SIZE_KEY, 4);
+    var modeBefore = duo.isAI() + ':' + duo.level();
     duo.openSettings({
       onReset: save,
       hasProgress: function () {
         return !S.over && drawn() > 0;
       },
       onModeChange: function () {
-        S = fresh(FG.store.get(SIZE_KEY, 4), 0);
+        // เปลี่ยนโหมด → แดงเริ่ม (เหมือนเดิม) · เปลี่ยนแค่ขนาด → คนเริ่มคนเดิม
+        var sameMode = duo.isAI() + ':' + duo.level() === modeBefore;
+        S = fresh(FG.store.get(SIZE_KEY, 4), sameMode ? S.starter : 0);
         cand = -1;
         render();
         save();
         cpuTurn();
       },
       build: function (body) {
-        body.appendChild(FG.label('ขนาดกระดาน (ใช้ตั้งแต่ตาใหม่)'));
         body.appendChild(
-          FG.choice(
-            SIZES.map(function (s) {
-              return { value: s, label: s + '×' + s };
-            }),
-            FG.store.get(SIZE_KEY, 4),
-            function (v) {
-              FG.store.set(SIZE_KEY, v);
-              if (S.over || drawn() === 0) {
-                duo.cancelCPU();
-                S = fresh(v, S.starter);
-                render();
-                save();
-                cpuTurn();
-              } else {
-                FG.toast('ขนาด ' + v + '×' + v + ' จะเริ่มตาหน้า');
+          FG.group(
+            'ขนาดกระดาน',
+            FG.choice(
+              SIZES.map(function (s) {
+                return { value: s, label: s + '×' + s };
+              }),
+              size,
+              function (v) {
+                size = v;
               }
-            }
+            )
           )
         );
+      },
+      needsNew: function () {
+        return size !== FG.store.get(SIZE_KEY, 4);
+      },
+      save: function () {
+        FG.store.set(SIZE_KEY, size);
       }
     });
-  });
+  };
 
   /* ---------- boot ---------- */
   var saved = FG.store.get(KEY, null);

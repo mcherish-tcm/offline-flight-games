@@ -196,6 +196,7 @@
   function nextRound() {
     FG.closeSheet();
     duo.cancelCPU();
+    duo.newRound();
     S = fresh(1 - S.starter);
     sel = null;
     arrivedAt = -1;
@@ -207,6 +208,7 @@
   function restartRound() {
     FG.closeSheet();
     duo.cancelCPU();
+    duo.newRound();
     S = fresh(S.starter);
     sel = null;
     arrivedAt = -1;
@@ -387,7 +389,9 @@
     });
   });
 
-  document.getElementById('settings').addEventListener('click', function () {
+  // ⚙️ (ปุ่มเฟืองบนแถบหัว — app.js ผูกปุ่มให้แล้ว) · การกินมีผลทันทีหลังกดบันทึก (เหมือนเดิม)
+  FG.openSettings = function () {
+    var mustEat = force();
     duo.openSettings({
       onReset: save,
       hasProgress: function () {
@@ -402,25 +406,31 @@
         cpuTurn();
       },
       build: function (body) {
-        body.appendChild(FG.label('การกิน'));
         body.appendChild(
-          FG.choice(
-            [
-              { value: true, label: 'บังคับกิน' },
-              { value: false, label: 'ไม่บังคับกิน' }
-            ],
-            force(),
-            function (v) {
-              FG.store.set(FORCE_KEY, v);
-              sel = null;
-              render();
-              FG.toast(v ? 'บังคับกิน: มีทางกินต้องกิน' : 'ไม่บังคับกิน: เลือกเดินธรรมดาได้');
-            }
+          FG.group(
+            'การกิน',
+            FG.choice(
+              [
+                { value: true, label: 'บังคับกิน' },
+                { value: false, label: 'ไม่บังคับกิน' }
+              ],
+              mustEat,
+              function (v) {
+                mustEat = v;
+              }
+            )
           )
         );
+      },
+      save: function () {
+        if (mustEat === force()) return;
+        FG.store.set(FORCE_KEY, mustEat);
+        sel = null;
+        render();
+        FG.toast(mustEat ? 'บังคับกิน: มีทางกินต้องกิน' : 'ไม่บังคับกิน: เลือกเดินธรรมดาได้');
       }
     });
-  });
+  };
 
   /* ---------- boot ---------- */
   var saved = FG.store.get(KEY, null);

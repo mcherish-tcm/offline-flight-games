@@ -37,7 +37,6 @@
   var movesEl = document.getElementById('moves');
   var timeEl = document.getElementById('time');
   var bestEl = document.getElementById('best');
-  var settingsBtn = document.getElementById('settings');
 
   var duo = FGDuo.create({
     id: 'memory',
@@ -88,7 +87,6 @@
     duo.sides[0].hidden = !isDuo;
     duo.sides[1].hidden = !isDuo;
     soloEl.hidden = isDuo;
-    settingsBtn.hidden = !isDuo;
   }
 
   function render() {
@@ -129,7 +127,7 @@
     if (FG.isSheetOpen()) return;
     var S = G.s;
     if (S.over) {
-      if (Date.now() - endedAt > 900) newGame(S.size, S.duo);
+      if (Date.now() - endedAt > 900) next();
       return;
     }
     if (S.pending) {
@@ -194,61 +192,82 @@
     }, 700);
   }
 
-  function next() {
-    newGame(G.s.size, G.s.duo);
+  // โหมด + ขนาดที่ตั้งไว้ (⚙️) — เกมใหม่/ตาต่อไปใช้ค่านี้
+  function pref() {
+    var p = FG.store.get('mem:pref', null) || {};
+    return { size: M.SIZES[p.size] ? p.size : 's', duo: !!p.duo };
   }
 
+  function next() {
+    var p = pref();
+    newGame(p.size, p.duo);
+  }
+
+  function inProgress() {
+    return !!G && G.started && !G.s.over;
+  }
+
+  // ↻ = เกมใหม่ด้วยโหมด/ขนาดที่ตั้งไว้ (เปลี่ยนได้ที่ ⚙️)
   document.getElementById('restart').addEventListener('click', function () {
-    var size = G.s.size;
-    var isDuo = G.s.duo;
-    var body = document.createElement('div');
-    body.appendChild(FG.label('โหมด'));
-    body.appendChild(
-      FG.choice(
-        [
-          { value: false, label: 'คนเดียว' },
-          { value: true, label: '2 คนผลัดกัน' }
-        ],
-        isDuo,
-        function (v) {
-          isDuo = v;
-        }
-      )
-    );
-    body.appendChild(FG.label('ขนาด'));
-    body.appendChild(
-      FG.choice(
-        [
-          { value: 's', label: '4×4' },
-          { value: 'm', label: '4×6' },
-          { value: 'l', label: '6×6' }
-        ],
-        size,
-        function (v) {
-          size = v;
-        }
-      )
-    );
-    FG.sheet({
-      title: 'เกมใหม่',
-      text: G.started && !G.s.over ? 'ตาที่เล่นอยู่จะหายไป' : '4×4 = 8 คู่ · 4×6 = 12 คู่ · 6×6 = 18 คู่',
-      body: body,
-      actions: [
-        { label: 'ยกเลิก' },
-        {
-          label: 'เริ่ม',
-          primary: true,
-          onClick: function () {
-            newGame(size, isDuo);
-          }
-        }
-      ]
-    });
+    FG.confirmNew({ inProgress: inProgress, restart: next, text: 'ตาที่เล่นอยู่จะหายไป' });
   });
 
-  settingsBtn.addEventListener('click', function () {
-    duo.openSettings({ onReset: save });
-  });
+  // ⚙️: โหมด · ขนาด (เริ่มเกมใหม่จึงมีผล) · ป้ายกลับหัว + ล้างสกอร์ (เฉพาะ 2 คน)
+  FG.openSettings = function () {
+    var cur = pref();
+    var p = { size: cur.size, duo: cur.duo };
+    var flipEl = null;
+    FG.settings({
+      build: function (body) {
+        body.appendChild(
+          FG.group(
+            'โหมด',
+            FG.choice(
+              [
+                { value: false, label: 'คนเดียว' },
+                { value: true, label: '2 คนผลัดกัน' }
+              ],
+              p.duo,
+              function (v) {
+                p.duo = v;
+                flipEl.hidden = !v;
+              }
+            )
+          )
+        );
+        body.appendChild(
+          FG.group(
+            'ขนาด',
+            FG.choice(
+              [
+                { value: 's', label: '4×4' },
+                { value: 'm', label: '4×6' },
+                { value: 'l', label: '6×6' }
+              ],
+              p.size,
+              function (v) {
+                p.size = v;
+              }
+            ),
+            '4×4 = 8 คู่ · 4×6 = 12 คู่ · 6×6 = 18 คู่'
+          )
+        );
+        flipEl = duo.flipGroup();
+        flipEl.hidden = !p.duo;
+        body.appendChild(flipEl);
+        if (G.s.duo) body.appendChild(FG.group('', null, 'สกอร์รวม 2 คน: ' + duo.summary()));
+      },
+      needsNew: function () {
+        return p.size !== cur.size || p.duo !== cur.duo;
+      },
+      save: function () {
+        FG.store.set('mem:pref', { size: p.size, duo: p.duo });
+      },
+      inProgress: inProgress,
+      restart: next,
+      actions: G.s.duo ? [duo.resetAction(save)] : []
+    });
+  };
 
   /* ---------- timer (คนเดียว) ---------- */
   setInterval(function () {
@@ -270,7 +289,6 @@
     build();
     render();
   } else {
-    var pref = FG.store.get('mem:pref', { size: 's', duo: false });
-    newGame(M.SIZES[pref.size] ? pref.size : 's', !!pref.duo);
+    next(); // โหมด + ขนาดที่ตั้งไว้ (pref())
   }
 })();

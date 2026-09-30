@@ -133,6 +133,7 @@
   function nextRound() {
     FG.closeSheet();
     duo.cancelCPU();
+    duo.newRound();
     S = fresh(1 - S.starter);
     aim = -1;
     render();
@@ -143,6 +144,7 @@
   function restartRound() {
     FG.closeSheet();
     duo.cancelCPU();
+    duo.newRound();
     S = fresh(S.starter);
     aim = -1;
     render();
@@ -243,7 +245,9 @@
     });
   });
 
-  document.getElementById('settings').addEventListener('click', function () {
+  // ⚙️ (ปุ่มเฟืองบนแถบหัว — app.js ผูกปุ่มให้แล้ว) · การวางเม็ดมีผลทันทีหลังกดบันทึก
+  FG.openSettings = function () {
+    var tap2 = confirmOn();
     duo.openSettings({
       onReset: save,
       hasProgress: function () {
@@ -257,24 +261,30 @@
         cpuTurn();
       },
       build: function (body) {
-        body.appendChild(FG.label('การวางเม็ด'));
         body.appendChild(
-          FG.choice(
-            [
-              { value: true, label: 'แตะ 2 ครั้ง' },
-              { value: false, label: 'แตะครั้งเดียว' }
-            ],
-            confirmOn(),
-            function (v) {
-              FG.store.set(CONFIRM_KEY, v);
-              aim = -1;
-              render();
-            }
+          FG.group(
+            'การวางเม็ด',
+            FG.choice(
+              [
+                { value: true, label: 'แตะ 2 ครั้ง' },
+                { value: false, label: 'แตะครั้งเดียว' }
+              ],
+              tap2,
+              function (v) {
+                tap2 = v;
+              }
+            )
           )
         );
+      },
+      save: function () {
+        if (tap2 === confirmOn()) return;
+        FG.store.set(CONFIRM_KEY, tap2);
+        aim = -1;
+        render();
       }
     });
-  });
+  };
 
   /* ---------- boot ---------- */
   var saved = FG.store.get(KEY, null);

@@ -1,5 +1,38 @@
 /* Hallmark · extends App Shell (night cabin) · สไปเดอร์ — ใช้ shared/cards.css เป็นหลัก · tokens only */
 
+/* ป้าย "1 ดอก · เก็บ 0/8" แตะได้ → เปิดตั้งค่า (v8) · ขีดเส้นประ + ▾ ให้รู้ว่าแตะได้ */
+.sp-mode {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3xs);
+  min-height: 36px;
+  padding: 0 var(--space-xs);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline dotted;
+  text-underline-offset: 4px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.sp-mode:empty {
+  visibility: hidden;
+}
+
+.sp-mode::after {
+  content: '▾';
+  font-size: 0.85em;
+  color: var(--color-ink-3);
+  text-decoration: none;
+}
+
+.sp-mode:active {
+  background: var(--color-paper-3);
+}
+
 /* กองแจก: ตัวเลขจำนวนรอบที่เหลือ */
 .sp-count {
   position: absolute;

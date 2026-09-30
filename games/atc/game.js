@@ -26,7 +26,11 @@
   var bestEl = document.getElementById('best');
   var bestLabel = document.getElementById('best-label');
 
-  var mode = FG.store.get('atc:mode', 'solo') === 'duo' ? 'duo' : 'solo';
+  // โหมดที่ตั้งไว้ ('atc:mode') · mode = โหมดของเกมที่กำลังเล่น (เปลี่ยนกลางเกมแล้วเลือก "ใช้ตาหน้า" จะยังไม่เปลี่ยน)
+  function prefMode() {
+    return FG.store.get('atc:mode', 'solo') === 'duo' ? 'duo' : 'solo';
+  }
+  var mode = prefMode();
   var status = 'ready'; // ready | play | paused | over | handoff
   var field = null;
   var world = null;
@@ -422,6 +426,7 @@
   }
 
   function startGame() {
+    mode = prefMode();
     seed = (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0;
     round = 0;
     duoScores = [0, 0];
@@ -511,24 +516,29 @@
   }
 
   /* ---------- หน้าทับ (เริ่ม/หยุด/จบ/ส่งเครื่อง) ---------- */
-  var modeChoice = FG.choice(
-    [
-      { value: 'solo', label: 'คนเดียว' },
-      { value: 'duo', label: '2 คนผลัดกัน' }
-    ],
-    mode,
-    function (v) {
-      mode = v;
-      FG.store.set('atc:mode', v);
-      paintStats();
-    }
-  );
-  ovMode.appendChild(modeChoice);
+  var MODE_CHOICES = [
+    { value: 'solo', label: 'คนเดียว' },
+    { value: 'duo', label: '2 คนผลัดกัน' }
+  ];
+
+  // ตัวเลือกโหมดบนหน้าทับ (ก่อนเริ่ม/หลังจบ) — ตรงกับค่าที่ตั้งไว้เสมอ
+  function paintModeChoice() {
+    ovMode.innerHTML = '';
+    ovMode.appendChild(
+      FG.choice(MODE_CHOICES, prefMode(), function (v) {
+        FG.store.set('atc:mode', v);
+        mode = v;
+        paintStats();
+      })
+    );
+  }
+  paintModeChoice();
 
   function show(title, html, go, withMode) {
     ovTitle.textContent = title;
     ovText.innerHTML = html;
     ovGo.lastChild.textContent = go;
+    if (withMode) paintModeChoice();
     ovMode.hidden = !withMode;
     ovLegend.hidden = !(status === 'ready' || status === 'paused');
     overlay.hidden = false;
@@ -628,18 +638,63 @@
     }, 120);
   });
 
+  function showReady() {
+    clearTimeout(overTimer);
+    cancelAnimationFrame(raf);
+    raf = 0;
+    drags = {};
+    status = 'ready';
+    mode = prefMode();
+    round = 0;
+    duoScores = [0, 0];
+    world = null;
+    field = null; // layout() จัดสนามใหม่ให้พอดีจอ
+    layout();
+    draw();
+    paintStats();
+    setPauseIcon();
+    pauseBtn.disabled = true;
+    show(
+      'หอบังคับการบิน',
+      '<b>ลากนิ้วจากเครื่องบิน</b> ไปที่ปากรันเวย์สีเดียวกัน (ฝั่งที่มีลูกศร) · ห้ามชนกัน',
+      'เริ่มเล่น',
+      true
+    );
+  }
+
+  // ⚙️: คนเดียว / 2 คนผลัดกัน · เปิดตอนกำลังเล่น = หยุดเกมก่อน
+  FG.openSettings = function () {
+    pause();
+    var cur = prefMode();
+    var m = cur;
+    FG.settings({
+      build: function (body) {
+        body.appendChild(
+          FG.group(
+            'โหมด',
+            FG.choice(MODE_CHOICES, m, function (v) {
+              m = v;
+            }),
+            '2 คน: ผลัดกันเล่นคนละรอบ เครื่องบินมาชุดเดียวกัน แล้วเทียบกันว่าใครลงจอดได้มากกว่า'
+          )
+        );
+      },
+      needsNew: function () {
+        return m !== mode;
+      },
+      save: function () {
+        FG.store.set('atc:mode', m);
+      },
+      inProgress: function () {
+        return status === 'play' || status === 'paused' || status === 'handoff';
+      },
+      // ยังไม่เริ่ม/จบแล้ว = เปลี่ยนบนหน้าเริ่มเลย · เล่นค้าง = กลับไปหน้าเริ่ม (ยังไม่ออกบิน)
+      restart: showReady
+    });
+  };
+
   /* ---------- boot ---------- */
   readColors();
-  layout();
-  draw();
   saveHub();
-  paintStats();
-  setPauseIcon();
-  pauseBtn.disabled = true;
-  show(
-    'หอบังคับการบิน',
-    '<b>ลากนิ้วจากเครื่องบิน</b> ไปที่ปากรันเวย์สีเดียวกัน (ฝั่งที่มีลูกศร) · ห้ามชนกัน',
-    'เริ่มเล่น',
-    true
-  );
+  showReady();
 })();

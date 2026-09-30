@@ -241,6 +241,7 @@
     FG.closeSheet();
     duo.cancelCPU();
     stopAnim();
+    duo.newRound();
     S = fresh(1 - S.starter);
     render();
     save();
@@ -251,6 +252,7 @@
     FG.closeSheet();
     duo.cancelCPU();
     stopAnim();
+    duo.newRound();
     S = fresh(S.starter);
     render();
     save();
@@ -270,7 +272,8 @@
     });
   });
 
-  document.getElementById('settings').addEventListener('click', function () {
+  // ⚙️ (ปุ่มเฟืองบนแถบหัว — app.js ผูกปุ่มให้แล้ว)
+  FG.openSettings = function () {
     duo.openSettings({
       onReset: save,
       hasProgress: function () {
@@ -284,7 +287,7 @@
         cpuTurn();
       }
     });
-  });
+  };
 
   // ปุ่มตั้งค่าเปลี่ยน "กลับหัว" → วาดใหม่
   document.addEventListener('click', function (e) {

@@ -29,13 +29,14 @@
       <div class="bar__actions">
         <button type="button" class="icon-btn" data-howto="spider" data-icon="info" aria-label="วิธีเล่น"></button>
         <button type="button" class="icon-btn" id="undo" data-icon="undo" aria-label="ย้อน" disabled></button>
-        <button type="button" class="icon-btn" id="new" data-icon="restart" aria-label="แจกใหม่ / เลือกจำนวนดอก"></button>
+        <button type="button" class="icon-btn" id="settings" data-settings data-icon="gear" aria-label="ตั้งค่า · จำนวนดอก"></button>
+        <button type="button" class="icon-btn" id="new" data-icon="restart" aria-label="แจกใหม่"></button>
       </div>
     </header>
     <main class="stage cards">
       <div class="cards-top">
         <span>ย้าย <b class="num" id="moves">0</b></span>
-        <span id="mode"></span>
+        <button type="button" class="sp-mode" id="mode" aria-label="จำนวนดอก — แตะเพื่อเปลี่ยน"></button>
         <span class="num" id="time">0:00</span>
       </div>
       <div class="cards-board" id="board" aria-label="โต๊ะไพ่ แตะไพ่เพื่อย้ายไปที่ที่ลงได้ หรือลากวาง"></div>

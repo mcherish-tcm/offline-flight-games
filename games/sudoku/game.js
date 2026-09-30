@@ -120,6 +120,7 @@
   }
 
   /* ---------- state ---------- */
+  var LEVEL_KEY = 'sudoku:level'; // v8: ระดับที่ตั้งไว้สำหรับเกมใหม่
   var S = null; // {level, puzzle[], solution[], values[], notes[], seconds, done}
   var sel = -1;
   var notesMode = false;
@@ -166,8 +167,15 @@
     keyEls[d] = key;
   }
 
+  // ระดับที่ตั้งไว้ (⚙️ หรือเลือกตอนเริ่มครั้งแรก) — ปุ่ม ↻ ใช้ระดับนี้
+  function prefLevel() {
+    var l = FG.store.get(LEVEL_KEY, null);
+    return LEVELS[l] ? l : S && LEVELS[S.level] ? S.level : 'easy';
+  }
+
   function start(level) {
     FG.closeSheet();
+    FG.store.set(LEVEL_KEY, level);
     var g = generate(level);
     S = {
       level: level,
@@ -400,7 +408,81 @@
   });
   document.getElementById('erase').addEventListener('click', erase);
   undoBtn.addEventListener('click', undo);
-  document.getElementById('new').addEventListener('click', askNew);
+
+  function inProgress() {
+    return !!S && !S.done;
+  }
+
+  // ↻ = เกมใหม่ระดับที่ตั้งไว้ (ยังไม่มีเกมเลย = เปิดหน้าเลือกระดับ)
+  document.getElementById('new').addEventListener('click', function () {
+    if (!S) {
+      askNew();
+      return;
+    }
+    FG.confirmNew({
+      inProgress: inProgress,
+      restart: function () {
+        start(prefLevel());
+      },
+      text: 'เกมที่เล่นอยู่จะหายไป · เกมใหม่ระดับ' + LEVELS[prefLevel()].label
+    });
+  });
+
+  // ⚙️: ระดับ (เริ่มเกมใหม่จึงมีผล) · เช็คผิด (มีผลทันที)
+  FG.openSettings = function () {
+    var cur = prefLevel();
+    var level = cur;
+    var check = checkOn;
+    FG.settings({
+      build: function (body) {
+        body.appendChild(
+          FG.group(
+            'ระดับ',
+            FG.choice(
+              ['easy', 'medium', 'hard'].map(function (l) {
+                return { value: l, label: LEVELS[l].label };
+              }),
+              level,
+              function (v) {
+                level = v;
+              }
+            )
+          )
+        );
+        body.appendChild(
+          FG.group(
+            'เช็คผิด (เลขที่ผิดเป็นสีแดง)',
+            FG.choice(
+              [
+                { value: true, label: 'เปิด' },
+                { value: false, label: 'ปิด' }
+              ],
+              check,
+              function (v) {
+                check = v;
+              }
+            ),
+            'เปิด/ปิดได้จากปุ่ม "เช็คผิด" ใต้ตารางด้วย'
+          )
+        );
+      },
+      needsNew: function () {
+        return level !== cur || !S;
+      },
+      save: function () {
+        FG.store.set(LEVEL_KEY, level);
+        if (check !== checkOn) {
+          checkOn = check;
+          FG.store.set('sudoku:check', checkOn);
+          render();
+        }
+      },
+      inProgress: inProgress,
+      restart: function () {
+        start(level);
+      }
+    });
+  };
 
   document.addEventListener('keydown', function (e) {
     if (!S || FG.isSheetOpen()) return;

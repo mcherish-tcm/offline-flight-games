@@ -206,35 +206,13 @@
   });
 
   // ขอบล่างจอ: ถ้าแถบปุ่ม/แถบท่าทางของมือถือบังปุ่มล่างสุดในเกม ให้เว้นเพิ่ม (ค่าจริงอยู่ใน shared/app.js)
+  // v8: ใช้ชุดตัวเลือกเดียวกับหน้าต่าง ⚙️ ในทุกเกม (FG.gapGroup) — เปลี่ยนที่ไหนก็มีผลทุกเกม
   document.getElementById('gap-btn').addEventListener('click', function () {
-    var cur = FG.getGap();
     var body = document.createElement('div');
-    body.appendChild(FG.label('เว้นที่ว่างใต้ปุ่มล่างสุด'));
-    var note = document.createElement('p');
-    note.className = 'sheet__text';
-    function paintNote(px) {
-      note.textContent = 'ตอนนี้เว้นอยู่ ' + Math.round(Math.max(px, FG.envBottom())) + ' px' + (FG.isStandalone() ? ' (เปิดแบบแอป)' : ' (เปิดในเบราว์เซอร์)');
-    }
-    body.appendChild(
-      FG.choice(
-        [
-          { value: 'auto', label: 'อัตโนมัติ' },
-          { value: 0, label: 'ไม่เว้น' },
-          { value: 24, label: 'น้อย' },
-          { value: 48, label: 'กลาง' },
-          { value: 72, label: 'มาก' }
-        ],
-        cur,
-        function (v) {
-          paintNote(FG.setGap(v));
-        }
-      )
-    );
-    body.appendChild(note);
-    paintNote(FG.setGap(cur));
+    body.appendChild(FG.gapGroup('เว้นที่ว่างใต้ปุ่มล่างสุด'));
     FG.sheet({
       title: 'ขอบล่างจอ',
-      text: 'ถ้าในเกม ปุ่มแถวล่างสุดถูกแถบปุ่มหรือขีดปัดของมือถือบัง ให้เลือก <b>กลาง</b> หรือ <b>มาก</b> แล้วเปิดเกมดูอีกครั้ง · ปกติใช้ <b>อัตโนมัติ</b>',
+      text: 'ถ้าในเกม ปุ่มแถวล่างสุดถูกแถบปุ่มหรือขีดปัดของมือถือบัง ให้เลือก <b>กลาง</b> หรือ <b>มาก</b> แล้วเปิดเกมดูอีกครั้ง · ปกติใช้ <b>อัตโนมัติ</b> · ในเกมเปลี่ยนได้ที่ปุ่มรูปเฟือง (ตั้งค่า)',
       body: body,
       actions: [{ label: 'เสร็จ', primary: true }]
     });

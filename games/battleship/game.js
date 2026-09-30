@@ -583,133 +583,107 @@
     });
   });
 
-  document.getElementById('settings').addEventListener('click', function () {
+  // ⚙️ (ปุ่มเฟืองบนแถบหัว — app.js ผูกปุ่มให้แล้ว)
+  // โหมด/ความยาก = เริ่มเกมใหม่จึงมีผล (เกมใหม่อ่านจาก opts) · กติกาการยิง = มีผลทันทีหลังกดบันทึก
+  FG.openSettings = function () {
     var pending = { ai: opts.ai, level: opts.level, rule: opts.rule };
-    var frag = document.createDocumentFragment();
     var levelGroup;
+    // โหมดของเกมที่กำลังเล่น (อาจต่างจาก opts ถ้าเคยเลือก "ใช้ตาหน้า")
+    var live = { ai: !!S.g.ai, level: S.g.level === 2 ? 2 : 1 };
 
-    function group(title, node, hintText) {
-      var d = document.createElement('div');
-      d.className = 'duo-group';
-      d.appendChild(FG.label(title));
-      d.appendChild(node);
-      if (hintText) {
-        var p = document.createElement('p');
-        p.className = 'duo-hint';
-        p.textContent = hintText;
-        d.appendChild(p);
-      }
-      frag.appendChild(d);
-      return d;
+    function differs(a, b) {
+      return a.ai !== b.ai || (a.ai && a.level !== b.level);
     }
 
-    group(
-      'โหมด',
-      FG.choice(
-        [
-          { value: false, label: 'เล่น 2 คน' },
-          { value: true, label: 'เล่นกับคอม' }
-        ],
-        pending.ai,
-        function (v) {
-          pending.ai = v;
-          levelGroup.hidden = !v;
+    FG.settings({
+      build: function (body) {
+        body.appendChild(
+          FG.group(
+            'โหมด',
+            FG.choice(
+              [
+                { value: false, label: 'เล่น 2 คน' },
+                { value: true, label: 'เล่นกับคอม' }
+              ],
+              pending.ai,
+              function (v) {
+                pending.ai = v;
+                levelGroup.hidden = !v;
+              }
+            ),
+            '2 คน: ส่งเครื่องให้กัน มีจอบังทุกครั้งที่เปลี่ยนตา'
+          )
+        );
+        levelGroup = FG.group(
+          'ความยากของคอม',
+          FG.choice(
+            [
+              { value: 1, label: 'ง่าย' },
+              { value: 2, label: 'ยาก' }
+            ],
+            pending.level,
+            function (v) {
+              pending.level = v;
+            }
+          ),
+          'คุณเป็นฝั่งแดง · สลับกันเริ่มทุกเกม · สกอร์กับคอมนับแยกจากเล่น 2 คน'
+        );
+        levelGroup.hidden = !pending.ai;
+        body.appendChild(levelGroup);
+        body.appendChild(
+          FG.group(
+            'กติกาการยิง',
+            FG.choice(
+              [
+                { value: 'alt', label: RULES.alt },
+                { value: 'chain', label: RULES.chain }
+              ],
+              pending.rule,
+              function (v) {
+                pending.rule = v;
+              }
+            ),
+            'เปลี่ยนกติกาการยิงได้ทุกเมื่อ มีผลทันที'
+          )
+        );
+        var sc = 'สกอร์รวม' + (S.g.ai ? ' (กับคอม' + LEVELS[S.g.level] + ')' : '') + ': ' + summary();
+        if (differs(opts, live)) sc += ' · เกมหน้าจะเป็น: ' + (opts.ai ? 'เล่นกับคอม (' + LEVELS[opts.level] + ')' : 'เล่น 2 คน');
+        body.appendChild(FG.group('', null, sc));
+      },
+      needsNew: function () {
+        return differs(pending, opts);
+      },
+      save: function () {
+        if (pending.rule !== opts.rule) {
+          S.g.rule = pending.rule;
+          render();
+          FG.toast('กติกา: ' + RULES[pending.rule], 2000);
         }
-      ),
-      '2 คน: ส่งเครื่องให้กัน มีจอบังทุกครั้งที่เปลี่ยนตา'
-    );
-    levelGroup = group(
-      'ความยากของคอม',
-      FG.choice(
-        [
-          { value: 1, label: 'ง่าย' },
-          { value: 2, label: 'ยาก' }
-        ],
-        pending.level,
-        function (v) {
-          pending.level = v;
-        }
-      ),
-      'คุณเป็นฝั่งแดง · สลับกันเริ่มทุกเกม · สกอร์กับคอมนับแยกจากเล่น 2 คน'
-    );
-    levelGroup.hidden = !pending.ai;
-    group(
-      'กติกาการยิง',
-      FG.choice(
-        [
-          { value: 'alt', label: RULES.alt },
-          { value: 'chain', label: RULES.chain }
-        ],
-        pending.rule,
-        function (v) {
-          pending.rule = v;
-        }
-      ),
-      'เปลี่ยนกติกาการยิงได้ทุกเมื่อ มีผลทันที'
-    );
-    var sc = document.createElement('p');
-    sc.className = 'duo-hint';
-    sc.textContent = 'สกอร์รวม' + (S.g.ai ? ' (กับคอม' + LEVELS[S.g.level] + ')' : '') + ': ' + summary();
-    frag.appendChild(sc);
-
-    var resetting = false;
-
-    function applyMode() {
-      opts.ai = pending.ai;
-      opts.level = pending.level;
-      FG.store.set(OPTS, opts);
-      newGame(0);
-      FG.toast(opts.ai ? 'เล่นกับคอม (' + LEVELS[opts.level] + ')' : 'เล่น 2 คน');
-    }
-
-    function finishSettings() {
-      if (resetting) return;
-      if (pending.rule !== opts.rule) {
+        opts.ai = pending.ai;
+        opts.level = pending.level;
         opts.rule = pending.rule;
         FG.store.set(OPTS, opts);
-        S.g.rule = pending.rule;
-        render();
         save();
-        FG.toast('กติกา: ' + RULES[pending.rule], 2000);
-      }
-      var modeChanged = pending.ai !== opts.ai || (pending.ai && pending.level !== opts.level);
-      if (!modeChanged) return;
-      if (inProgress()) {
-        setTimeout(function () {
-          FG.sheet({
-            title: 'เปลี่ยนโหมดแล้วเริ่มเกมใหม่?',
-            text: 'เกมที่เล่นอยู่จะถูกล้าง สกอร์ที่เก็บไว้ยังอยู่',
-            actions: [
-              { label: 'ยกเลิก' },
-              { label: 'เปลี่ยนเลย', primary: true, onClick: applyMode }
-            ]
-          });
-        }, 0);
-      } else {
-        applyMode();
-      }
-    }
-
-    FG.sheet({
-      title: 'ตั้งค่า',
-      body: frag,
-      onDismiss: finishSettings,
+      },
+      inProgress: inProgress,
+      restart: function () {
+        newGame(0);
+        FG.toast(opts.ai ? 'เล่นกับคอม (' + LEVELS[opts.level] + ')' : 'เล่น 2 คน');
+      },
       actions: [
         {
           label: 'ล้างสกอร์',
           onClick: function () {
-            resetting = true;
             score = { w: [0, 0], d: 0 };
             FG.store.set(scoreKey(S.g), score);
             render();
             save();
             FG.toast('ล้างสกอร์แล้ว');
           }
-        },
-        { label: 'เสร็จ', primary: true, onClick: finishSettings }
+        }
       ]
     });
-  });
+  };
 
   FG.onVisibility(function (hidden) {
     if (hidden && S) save();

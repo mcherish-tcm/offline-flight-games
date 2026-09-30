@@ -9,6 +9,9 @@
  *   - คน = แดง (ล่าง) · คอม = ฟ้า (บน) · ความยาก 1 = ง่าย, 2 = ยาก
  *   - สกอร์แยกกัน: เล่น 2 คน / กับคอมง่าย / กับคอมยาก
  *   - duo.isCPU(p) → ตานี้คอมเดินไหม · duo.cpuMove(compute, apply) → รอให้ดูเป็นธรรมชาติ แล้วให้คอมเดิน
+ *
+ * v8: ตั้งค่าอยู่หลังปุ่มเฟือง ⚙️ (duo.openSettings ใช้ FG.settings) · เปลี่ยนโหมดกลางตาแล้วเลือก "ใช้ตาหน้า"
+ *     → เกมต้องเรียก duo.newRound() ทุกครั้งก่อนสร้างกระดานตาใหม่ (โหมดใหม่จะเริ่มใช้ตรงนั้น)
  */
 (function () {
   'use strict';
@@ -20,12 +23,24 @@
   var THINK_MIN = 520; // ms · คอมรออย่างน้อยเท่านี้ก่อนเดิน (ให้ดูเหมือนคิด)
   var THINK_LEAD = 160; // ms · หน่วงก่อนเริ่มคำนวณ ให้ป้าย "กำลังคิด…" ขึ้นก่อน
 
+  function cleanMode(m) {
+    return m && typeof m === 'object' ? { ai: !!m.ai, level: m.level === 2 ? 2 : 1 } : null;
+  }
+
+  function sameMode(a, b) {
+    return a.ai === b.ai && (!a.ai || a.level === b.level);
+  }
+
   function create(opts) {
     var modeKey = opts.id + ':mode';
+    // v8: เปลี่ยนโหมดกลางตาแล้วเลือก "ใช้ตาหน้า" → เก็บไว้ที่นี่ เกมเรียก duo.newRound() ตอนเริ่มตาใหม่แล้วค่อยใช้
+    var nextKey = opts.id + ':mode:next';
     var mode = { ai: false, level: 1 };
+    var next = null;
     if (opts.ai) {
-      var m = FG.store.get(modeKey, null);
-      if (m && typeof m === 'object') mode = { ai: !!m.ai, level: m.level === 2 ? 2 : 1 };
+      mode = cleanMode(FG.store.get(modeKey, null)) || mode;
+      next = cleanMode(FG.store.get(nextKey, null));
+      if (next && sameMode(next, mode)) next = null;
     }
     var score;
     var flip = !!FG.store.get(FLIP_KEY, false);
@@ -203,146 +218,154 @@
       cancelCPU: cancelCPU,
 
       /*
-       * o.build(frag) เพิ่มตัวเลือกของเกม · o.onReset() หลังล้างสกอร์
-       * o.hasProgress() → ตานี้เดินไปแล้วหรือยัง (ใช้ถามก่อนเปลี่ยนโหมด)
-       * o.onModeChange() → เปลี่ยนโหมด/ความยากแล้ว (เกมเริ่มตาใหม่)
+       * เริ่มตาใหม่: ถ้ามีโหมดที่ตั้งไว้ "ใช้ตาหน้า" → เปลี่ยนตอนนี้ (เกมเรียกก่อนสร้างกระดานตาใหม่ทุกครั้ง)
+       * คืน true ถ้าเปลี่ยนโหมด
+       */
+      newRound: function () {
+        if (!next) return false;
+        applyMode(next);
+        return true;
+      },
+
+      // ชุด "ป้ายชื่อคนฝั่งบน ตั้งตรง/กลับหัว" (มีผลทันที) — ใช้ในหน้าต่างตั้งค่า
+      flipGroup: flipGroup,
+
+      // ปุ่ม "ล้างสกอร์" สำหรับหน้าต่างตั้งค่า
+      resetAction: function (onReset) {
+        return {
+          label: 'ล้างสกอร์',
+          onClick: function () {
+            score = { w: [0, 0], d: 0 };
+            saveScore();
+            paint();
+            if (onReset) onReset();
+            FG.toast('ล้างสกอร์แล้ว');
+          }
+        };
+      },
+
+      /*
+       * ⚙️ ตั้งค่า (ใช้ FG.settings — ขอบล่างจอต่อท้ายให้เอง)
+       * o.build(body) เพิ่มตัวเลือกของเกม · o.needsNew() ตัวเลือกของเกมต้องเริ่มตาใหม่ไหม · o.save() บันทึกตัวเลือกของเกม
+       * o.hasProgress() → ตานี้เดินไปแล้วหรือยัง (ถาม "เริ่มใหม่เลย / ใช้ตาหน้า")
+       * o.onModeChange() → เริ่มตาใหม่ทันที (หลังเปลี่ยนโหมดแล้ว ถ้ามี) · o.onReset() หลังล้างสกอร์
        */
       openSettings: function (o) {
         o = o || {};
-        var pending = { ai: mode.ai, level: mode.level };
-        var frag = document.createDocumentFragment();
-
+        var target = next || mode;
+        var pending = { ai: target.ai, level: target.level };
         var levelGroup = null;
-        var flipGroup = document.createElement('div');
-        flipGroup.className = 'duo-group';
+        var flipEl = null;
 
         function sync() {
           if (levelGroup) levelGroup.hidden = !pending.ai;
-          flipGroup.hidden = pending.ai;
+          if (flipEl) flipEl.hidden = pending.ai;
         }
 
-        if (opts.ai) {
-          var modeGroup = document.createElement('div');
-          modeGroup.className = 'duo-group';
-          modeGroup.appendChild(FG.label('โหมด'));
-          modeGroup.appendChild(
-            FG.choice(
-              [
-                { value: false, label: 'เล่น 2 คน' },
-                { value: true, label: 'เล่นกับคอม' }
-              ],
-              pending.ai,
-              function (v) {
-                pending.ai = v;
-                sync();
-              }
-            )
-          );
-          frag.appendChild(modeGroup);
-
-          levelGroup = document.createElement('div');
-          levelGroup.className = 'duo-group';
-          levelGroup.appendChild(FG.label('ความยากของคอม'));
-          levelGroup.appendChild(
-            FG.choice(
-              [
-                { value: 1, label: 'ง่าย' },
-                { value: 2, label: 'ยาก' }
-              ],
-              pending.level,
-              function (v) {
-                pending.level = v;
-              }
-            )
-          );
-          var aiHint = document.createElement('p');
-          aiHint.className = 'duo-hint';
-          aiHint.textContent = 'คุณเป็นฝั่งแดง (ล่าง) · สลับกันเริ่มทุกตา · สกอร์กับคอมนับแยกจากเล่น 2 คน';
-          levelGroup.appendChild(aiHint);
-          frag.appendChild(levelGroup);
-        }
-
-        flipGroup.appendChild(FG.label('ป้ายชื่อคนฝั่งบน'));
-        flipGroup.appendChild(
-          FG.choice(
-            [
-              { value: false, label: 'ตั้งตรง' },
-              { value: true, label: 'กลับหัว' }
-            ],
-            flip,
-            function (v) {
-              flip = v;
-              FG.store.set(FLIP_KEY, v);
-              paint();
+        FG.settings({
+          build: function (body) {
+            if (opts.ai) {
+              body.appendChild(
+                FG.group(
+                  'โหมด',
+                  FG.choice(
+                    [
+                      { value: false, label: 'เล่น 2 คน' },
+                      { value: true, label: 'เล่นกับคอม' }
+                    ],
+                    pending.ai,
+                    function (v) {
+                      pending.ai = v;
+                      sync();
+                    }
+                  )
+                )
+              );
+              levelGroup = FG.group(
+                'ความยากของคอม',
+                FG.choice(
+                  [
+                    { value: 1, label: 'ง่าย' },
+                    { value: 2, label: 'ยาก' }
+                  ],
+                  pending.level,
+                  function (v) {
+                    pending.level = v;
+                  }
+                ),
+                'คุณเป็นฝั่งแดง (ล่าง) · สลับกันเริ่มทุกตา · สกอร์กับคอมนับแยกจากเล่น 2 คน'
+              );
+              body.appendChild(levelGroup);
             }
-          )
-        );
-        var hint = document.createElement('p');
-        hint.className = 'duo-hint';
-        hint.textContent = 'เลือก "กลับหัว" เมื่อนั่งหันหน้าเข้าหากัน วางมือถือไว้ตรงกลาง';
-        flipGroup.appendChild(hint);
-        frag.appendChild(flipGroup);
-        sync();
-
-        if (o.build) o.build(frag);
-        var sc = document.createElement('p');
-        sc.className = 'duo-hint';
-        sc.textContent = 'สกอร์รวม' + (mode.ai ? ' (กับคอม' + LEVELS[mode.level] + ')' : '') + ': ' + summary();
-        frag.appendChild(sc);
-
-        var resetting = false;
-
-        function applyMode() {
-          cancelCPU();
-          mode = { ai: pending.ai, level: pending.level };
-          FG.store.set(modeKey, mode);
-          loadScore();
-          paint();
-          if (o.onModeChange) o.onModeChange();
-          FG.toast(mode.ai ? 'เล่นกับคอม (' + LEVELS[mode.level] + ')' : 'เล่น 2 คน');
-        }
-
-        function finish() {
-          if (resetting) return;
-          if (pending.ai === mode.ai && (!pending.ai || pending.level === mode.level)) return;
-          if (o.hasProgress && o.hasProgress()) {
-            // ถามก่อน เพราะตาที่เล่นค้างจะถูกล้าง (เปิดหน้าต่างใหม่หลังหน้าต่างเดิมปิดแล้ว)
-            setTimeout(function () {
-              FG.sheet({
-                title: 'เปลี่ยนโหมดแล้วเริ่มตาใหม่?',
-                text: 'กระดานตานี้จะถูกล้าง สกอร์ที่เก็บไว้ยังอยู่',
-                actions: [
-                  { label: 'ยกเลิก' },
-                  { label: 'เปลี่ยนเลย', primary: true, onClick: applyMode }
-                ]
-              });
-            }, 0);
-          } else {
-            applyMode();
-          }
-        }
-
-        FG.sheet({
-          title: 'ตั้งค่า',
-          body: frag,
-          onDismiss: finish,
-          actions: [
-            {
-              label: 'ล้างสกอร์',
-              onClick: function () {
-                resetting = true;
-                score = { w: [0, 0], d: 0 };
-                saveScore();
-                paint();
-                if (o.onReset) o.onReset();
-                FG.toast('ล้างสกอร์แล้ว');
-              }
-            },
-            { label: 'เสร็จ', primary: true, onClick: finish }
-          ]
+            flipEl = flipGroup();
+            body.appendChild(flipEl);
+            sync();
+            if (o.build) o.build(body);
+            var sc = 'สกอร์รวม' + (mode.ai ? ' (กับคอม' + LEVELS[mode.level] + ')' : '') + ': ' + summary();
+            if (next) sc += ' · ตาหน้าจะเป็น: ' + modeLabel(next);
+            body.appendChild(FG.group('', null, sc));
+          },
+          needsNew: function () {
+            return !sameMode(pending, target) || !!(o.needsNew && o.needsNew());
+          },
+          save: function () {
+            if (o.save) o.save();
+          },
+          inProgress: function () {
+            return !!(o.hasProgress && o.hasProgress());
+          },
+          restart: function () {
+            if (!sameMode(pending, mode)) applyMode({ ai: pending.ai, level: pending.level });
+            else setNext(null);
+            if (o.onModeChange) o.onModeChange();
+          },
+          later: function () {
+            setNext(sameMode(pending, mode) ? null : { ai: pending.ai, level: pending.level });
+          },
+          actions: [api.resetAction(o.onReset)]
         });
       }
     };
+
+    function modeLabel(m) {
+      return m.ai ? 'เล่นกับคอม (' + LEVELS[m.level] + ')' : 'เล่น 2 คน';
+    }
+
+    function setNext(m) {
+      next = m;
+      if (m) FG.store.set(nextKey, m);
+      else FG.store.del(nextKey);
+    }
+
+    function applyMode(m) {
+      cancelCPU();
+      mode = { ai: m.ai, level: m.level };
+      FG.store.set(modeKey, mode);
+      setNext(null);
+      loadScore();
+      paint();
+      FG.toast(modeLabel(mode));
+    }
+
+    function flipGroup() {
+      return FG.group(
+        'ป้ายชื่อคนฝั่งบน',
+        FG.choice(
+          [
+            { value: false, label: 'ตั้งตรง' },
+            { value: true, label: 'กลับหัว' }
+          ],
+          flip,
+          function (v) {
+            flip = v;
+            FG.store.set(FLIP_KEY, v);
+            paint();
+            document.dispatchEvent(new CustomEvent('fg:duo-flip'));
+          }
+        ),
+        'เลือก "กลับหัว" เมื่อนั่งหันหน้าเข้าหากัน วางมือถือไว้ตรงกลาง'
+      );
+    }
 
     paint();
     return api;

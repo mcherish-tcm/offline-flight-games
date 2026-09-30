@@ -472,6 +472,68 @@ html:has(body.game) {
   overscroll-behavior: contain;
 }
 
+/* ---------- ⚙️ หน้าต่างตั้งค่า (FG.settings · v8) ---------- */
+.sheet__body:has(.settings) {
+  max-height: min(66dvh, 36rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.settings {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.set-group {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.set-hint {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-ink-3);
+}
+
+/* ตัวเลือก 5 ช่อง (ขอบล่างจอ) บนจอแคบ: กว้างตามคำ ไม่ให้ "อัตโนมัติ" ทับช่องข้าง ๆ */
+.set-group--gap .seg {
+  grid-auto-columns: auto;
+}
+
+.set-group--gap .seg button {
+  padding-inline: var(--space-2xs);
+  font-size: var(--text-sm);
+}
+
+/* ขอบล่างจอ = ตั้งค่ารวมทุกเกม → คั่นด้วยเส้นบาง ๆ ให้รู้ว่าไม่ใช่ของเกมนี้ */
+.settings > .set-group--gap:not(:first-child) {
+  padding-top: var(--space-md);
+  border-top: var(--rule-hair);
+}
+
+/* แถบหัวของเกม (ปุ่ม 2 ปุ่มขึ้นไป: ⓘ · ย้อน · ⚙️ · ↻) บนจอแคบ ≤ 400px: "หน้าแรก" เหลือแต่ลูกศร + ปุ่มชิดขึ้น
+   ให้ชื่อเกมยังอ่านได้ครบ (ทดสอบที่ 360px ครบ 22 เกม · v8) */
+@media (max-width: 400px) {
+  .bar:has(.bar__actions > .icon-btn:not([hidden]) ~ .icon-btn:not([hidden])) {
+    gap: var(--space-2xs);
+  }
+  .bar:has(.bar__actions > .icon-btn:not([hidden]) ~ .icon-btn:not([hidden])) .bar__back {
+    font-size: 0;
+    gap: 0;
+    padding-right: var(--space-2xs);
+  }
+  .bar:has(.bar__actions > .icon-btn:not([hidden]) ~ .icon-btn:not([hidden])) .bar__actions {
+    gap: 0;
+  }
+  .bar:has(.bar__actions > .icon-btn:not([hidden]) ~ .icon-btn:not([hidden])) .icon-btn {
+    width: 44px;
+  }
+  /* 5 ปุ่ม (ภาพปริศนาตอนเล่น) */
+  .bar:has(.bar__actions > .icon-btn:not([hidden]) ~ .icon-btn:not([hidden]) ~ .icon-btn:not([hidden]) ~ .icon-btn:not([hidden]) ~ .icon-btn:not([hidden])) .icon-btn {
+    width: 40px;
+  }
+}
+
 /* จอแคบมาก (320–359px): ปุ่มหน้าแรกเหลือแต่ลูกศร ให้ชื่อเกมมีที่ + ปุ่มบนแถบไม่ล้นจอ */
 @media (max-width: 359px) {
   .bar {

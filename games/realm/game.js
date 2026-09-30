@@ -1034,6 +1034,19 @@
     setupSheet(true);
   });
 
+  // ⚙️ (v8): แผนที่ / ผู้เล่น / ความยาว ยังเลือกที่หน้า "เกมใหม่" (ปุ่ม ↻) เหมือนเดิม — ที่นี่บอกค่าของเกมนี้ + ขอบล่างจอ
+  FG.openSettings = function () {
+    FG.settings({
+      build: function (body) {
+        var now = S
+          ? R.mapOf(S.s).name + ' · ' + MODES[S.mode].label + ' · ' + (S.s.phase === 'over' ? 'จบแล้ว ' + S.s.rounds + ' รอบ' : 'รอบ ' + S.s.round + '/' + S.s.rounds)
+          : 'ยังไม่ได้เริ่มเกม';
+        body.appendChild(FG.group('เกมนี้', null, now));
+        body.appendChild(FG.group('', null, 'แผนที่ · ผู้เล่น · ความยาวเกม เลือกได้ตอนเริ่มเกมใหม่ (ปุ่มลูกศรวงกลมบนแถบหัว)'));
+      }
+    });
+  };
+
   document.addEventListener('visibilitychange', function () {
     if (!document.hidden && S && !busy) schedule();
   });

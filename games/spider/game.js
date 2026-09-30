@@ -65,7 +65,7 @@
   }
 
   function undo() {
-    if (!history.length || busy || G.done) return;
+    if (!G || !history.length || busy || G.done) return;
     var h = JSON.parse(history.pop());
     G.s = h.s;
     G.moves = h.moves + 1;
@@ -91,7 +91,7 @@
   }
 
   function dealStock() {
-    if (busy || G.done) return;
+    if (!G || busy || G.done) return;
     var why = P.canDeal(G.s);
     if (why === 'empty') return;
     if (why === 'gap') {
@@ -124,7 +124,8 @@
               label: 'แจกใหม่',
               primary: true,
               onClick: function () {
-                newGame(G.s.suits);
+                // เปิดหน้าต่างใหม่หลังหน้าต่างผลปิดแล้ว
+                setTimeout(askSuits, 0);
               }
             }
           ]
@@ -197,16 +198,21 @@
 
   function render() {
     if (!L) layout();
-    var S = G.s;
     var y0 = L.g;
     C.place(stockSlot, L.colX(0), y0, 0);
-    stockSlot.style.visibility = S.stock.length ? 'hidden' : 'visible';
     doneSlots.forEach(function (el, k) {
       C.place(el, L.colX(2 + k), y0, 0);
     });
     colSlots.forEach(function (el, c) {
       C.place(el, L.colX(c), L.tabTop, 0);
     });
+    if (!G) {
+      // ยังไม่ได้แจก (รอเลือกจำนวนดอก) — วาดแค่ช่องว่าง
+      countEl.hidden = true;
+      return;
+    }
+    var S = G.s;
+    stockSlot.style.visibility = S.stock.length ? 'hidden' : 'visible';
 
     // กองแจก: 1 กองต่อ 1 รอบที่เหลือ ซ้อนเหลื่อมกันเล็กน้อย
     var rounds = Math.ceil(S.stock.length / 10);
@@ -264,7 +270,7 @@
   C.input(boardEl, {
     els: cardEls,
     busy: function () {
-      return busy || G.done;
+      return busy || !G || G.done;
     },
     pick: function (id, slot) {
       if (id == null) return null;
@@ -302,38 +308,98 @@
   });
 
   undoBtn.addEventListener('click', undo);
-  document.getElementById('new').addEventListener('click', function () {
-    var suits = G ? G.s.suits : 1;
+
+  /* ---------- จำนวนดอก (v8) ----------
+   * ค่าที่ตั้งไว้ = 'sp:suits' · ปุ่ม ↻ แจกใหม่ด้วยค่านี้ · เปลี่ยนได้ที่ ⚙️ หรือแตะป้าย "1 ดอก · เก็บ 0/8"
+   * เข้าเกมโดยไม่มีตาค้าง (ครั้งแรก / จบตาแล้ว) → ถาม "เล่นกี่ดอก" ก่อนแจก
+   */
+  var SUIT_CHOICES = [
+    { value: 1, label: '1 ดอก (ง่าย)' },
+    { value: 2, label: '2 ดอก' },
+    { value: 4, label: '4 ดอก' }
+  ];
+
+  function prefSuits() {
+    return P.cleanSuits(FG.store.get('sp:suits', 1));
+  }
+
+  function inProgress() {
+    return !!G && G.started && !G.done;
+  }
+
+  function suitsChoice(cur, onChange) {
+    return FG.group('จำนวนดอก (ยิ่งมากยิ่งยาก)', FG.choice(SUIT_CHOICES, cur, onChange), '1 ดอก = ไพ่ดอกเดียวทั้งโต๊ะ เรียงง่ายสุด · 4 ดอก = ยากสุด');
+  }
+
+  function askSuits() {
+    var suits = prefSuits();
     var body = document.createElement('div');
-    body.appendChild(FG.label('จำนวนดอก (ยิ่งมากยิ่งยาก)'));
-    body.appendChild(
-      FG.choice(
-        [
-          { value: 1, label: '1 ดอก (ง่าย)' },
-          { value: 2, label: '2 ดอก' },
-          { value: 4, label: '4 ดอก' }
-        ],
-        suits,
-        function (v) {
-          suits = v;
-        }
-      )
-    );
+    body.appendChild(suitsChoice(suits, function (v) {
+      suits = v;
+    }));
     FG.sheet({
-      title: 'แจกไพ่ใหม่?',
-      text: G.started && !G.done ? 'ตาที่เล่นอยู่จะหายไป' : '',
+      title: 'เล่นกี่ดอก',
+      text: 'เปลี่ยนทีหลังได้ที่ปุ่มรูปเฟือง หรือแตะป้ายจำนวนดอกเหนือโต๊ะ',
       body: body,
       actions: [
-        { label: 'ยกเลิก' },
         {
-          label: 'แจกใหม่',
+          label: 'แจกไพ่',
           primary: true,
           onClick: function () {
             newGame(suits);
           }
         }
-      ]
+      ],
+      // ปัดย้อนกลับ/แตะนอกหน้าต่าง = แจกตามที่เลือกไว้ (โต๊ะจะได้ไม่ว่าง)
+      onDismiss: function () {
+        newGame(suits);
+      }
     });
+  }
+
+  // ↻ = แจกใหม่ด้วยจำนวนดอกที่ตั้งไว้
+  document.getElementById('new').addEventListener('click', function () {
+    if (!G) {
+      askSuits();
+      return;
+    }
+    FG.confirmNew({
+      inProgress: inProgress,
+      restart: function () {
+        newGame(prefSuits());
+      },
+      title: 'แจกไพ่ใหม่?',
+      text: 'ตาที่เล่นอยู่จะหายไป · แจกใหม่แบบ ' + MODE_TH[prefSuits()],
+      go: 'แจกใหม่'
+    });
+  });
+
+  // ⚙️: จำนวนดอก (แจกใหม่จึงมีผล)
+  FG.openSettings = function () {
+    var cur = prefSuits();
+    var suits = cur;
+    FG.settings({
+      build: function (body) {
+        body.appendChild(suitsChoice(suits, function (v) {
+          suits = v;
+        }));
+      },
+      needsNew: function () {
+        return suits !== cur;
+      },
+      save: function () {
+        FG.store.set('sp:suits', suits);
+      },
+      inProgress: inProgress,
+      restart: function () {
+        newGame(suits);
+      }
+    });
+  };
+
+  // ป้าย "1 ดอก · เก็บ 0/8" แตะได้ → เปิด ⚙️
+  modeEl.addEventListener('click', function () {
+    if (!FG.isSheetOpen()) FG.openSettings();
   });
 
   document.addEventListener('keydown', function (e) {
@@ -366,14 +432,16 @@
 
   /* ---------- boot ---------- */
   var saved = FG.store.get(KEY, null);
-  if (saved && saved.g && saved.g.s && Array.isArray(saved.g.s.cols) && saved.g.s.cols.length === 10 && !saved.g.done) {
+  if (P.canResume(saved)) {
     G = saved.g;
     history = Array.isArray(saved.h) ? saved.h : [];
     buildCards(G.s.suits);
     layout();
     render();
   } else {
-    var s0 = FG.store.get('sp:suits', 1);
-    newGame(s0 === 2 || s0 === 4 ? s0 : 1);
+    // ไม่มีตาค้าง (ครั้งแรก / จบตาแล้ว) → ถามจำนวนดอกก่อนแจก (เลือกค่าล่าสุดไว้ให้)
+    layout();
+    render();
+    askSuits();
   }
 })();

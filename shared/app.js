@@ -58,6 +58,8 @@
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><path d="M12 7.6v.01" stroke-width="2.6"/>',
     grid: '<rect x="4" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.2"/>',
     cross: '<path d="M6 6l12 12M18 6L6 18"/>',
+    // เฟือง = ตั้งค่า (v8) — วาดเอง 8 ฟัน
+    gear: '<path d="M19.2 12.7L21.6 13.9L20.1 17.5L17.5 16.6L16.6 17.5L17.5 20.1L13.9 21.6L12.7 19.2L11.3 19.2L10.1 21.6L6.5 20.1L7.4 17.5L6.5 16.6L3.9 17.5L2.4 13.9L4.8 12.7L4.8 11.3L2.4 10.1L3.9 6.5L6.5 7.4L7.4 6.5L6.5 3.9L10.1 2.4L11.3 4.8L12.7 4.8L13.9 2.4L17.5 3.9L16.6 6.5L17.5 7.4L20.1 6.5L21.6 10.1L19.2 11.3z"/><circle cx="12" cy="12" r="3"/>',
     square: '<rect x="5" y="5" width="14" height="14" rx="2" fill="currentColor"/>'
   };
 
@@ -217,6 +219,21 @@
     var d = document.createElement('div');
     d.className = 'sheet__label';
     d.textContent = text;
+    return d;
+  }
+
+  // กลุ่มตัวเลือกในหน้าต่างตั้งค่า: หัวข้อ + ตัวเลือก + คำอธิบายสั้น (ไม่บังคับ)
+  function group(title, node, hintText) {
+    var d = document.createElement('div');
+    d.className = 'set-group';
+    if (title) d.appendChild(label(title));
+    if (node) d.appendChild(node);
+    if (hintText) {
+      var p = document.createElement('p');
+      p.className = 'set-hint';
+      p.textContent = hintText;
+      d.appendChild(p);
+    }
     return d;
   }
 
@@ -478,6 +495,124 @@
     return applyGap();
   }
 
+  // ชุดตัวเลือก "ขอบล่างจอ" — ใช้ทั้งหน้าแรกและหน้าต่าง ⚙️ ของทุกเกม (ค่าเดียวกัน key เดียวกัน)
+  // แตะแล้วมีผลทันที ไม่ต้องรอกดบันทึก
+  var GAP_CHOICES = [
+    { value: 'auto', label: 'อัตโนมัติ' },
+    { value: 0, label: 'ไม่เว้น' },
+    { value: 24, label: 'น้อย' },
+    { value: 48, label: 'กลาง' },
+    { value: 72, label: 'มาก' }
+  ];
+
+  function gapGroup(title) {
+    var note = document.createElement('p');
+    note.className = 'set-hint';
+    function paint(px) {
+      note.textContent =
+        'ปุ่มแถวล่างสุดโดนแถบของมือถือบัง → เลือก กลาง หรือ มาก · ตอนนี้เว้น ' +
+        Math.round(Math.max(px, envBottom())) +
+        ' px' +
+        (isStandalone() ? ' (เปิดแบบแอป)' : ' (เปิดในเบราว์เซอร์)');
+    }
+    var d = group(
+      title == null ? 'ขอบล่างจอ (ใช้กับทุกเกม)' : title,
+      choice(GAP_CHOICES, getGap(), function (v) {
+        paint(setGap(v));
+      })
+    );
+    d.classList.add('set-group--gap');
+    d.appendChild(note);
+    paint(applyGap());
+    return d;
+  }
+
+  /* ---------- ⚙️ ตั้งค่าของเกม (ปุ่มรูปเฟืองบนแถบหัวของทุกเกม · v8) ----------
+   * ในหน้าเกม: <button type="button" class="icon-btn" id="settings" data-settings data-icon="gear" aria-label="ตั้งค่า"></button>
+   * ปุ่มเรียก FG.openSettings() — ค่าเริ่มต้น = หน้าต่างที่มีแค่ "ขอบล่างจอ"
+   * เกมที่มีตัวเลือกของตัวเอง ให้แทนที่: FG.openSettings = function () { FG.settings({ ... }); };
+   *
+   * FG.settings(o):
+   *   o.build(body)   ใส่ตัวเลือกของเกม (FG.group + FG.choice) · จำค่าที่แตะไว้ในตัวแปรของเกมก่อน ยังไม่บันทึก
+   *   o.needsNew()    true = ค่าที่เลือกเปลี่ยนไป และต้องเริ่มเกมใหม่จึงมีผล (เรียกก่อน save)
+   *   o.save()        บันทึกค่าที่เลือก (ตอนกด "บันทึก") · ค่าที่มีผลทันทีได้ ให้ใช้เลยในนี้
+   *   o.inProgress()  true = มีเกมเล่นค้าง → ถาม "เริ่มเกมใหม่เลยไหม" (เริ่มใหม่เลย / ใช้ตาหน้า)
+   *   o.restart()     เริ่มเกมใหม่ด้วยค่าที่บันทึกแล้ว
+   *   o.later()       (ไม่บังคับ) เรียกเมื่อเลือก "ใช้ตาหน้า"
+   *   o.actions       ปุ่มเพิ่ม วางก่อนปุ่มบันทึก (เช่น ล้างสกอร์)
+   * ปิดหน้าต่างโดยไม่กดบันทึก = ไม่เปลี่ยนค่าของเกม (ขอบล่างจอมีผลทันทีที่แตะอยู่แล้ว)
+   */
+  function settings(o) {
+    o = o || {};
+    var body = document.createElement('div');
+    body.className = 'settings';
+    if (o.build) o.build(body);
+    body.appendChild(gapGroup());
+    var acts = (o.actions || []).slice();
+    acts.push({
+      label: o.save ? 'บันทึก' : 'เสร็จ',
+      primary: true,
+      onClick: function () {
+        var need = !!(o.needsNew && o.needsNew());
+        if (o.save) o.save();
+        if (!need) return;
+        if (o.inProgress && o.inProgress()) askNewNow(o);
+        else if (o.restart) o.restart();
+      }
+    });
+    return sheet({ title: o.title || 'ตั้งค่า', text: o.text, body: body, actions: acts });
+  }
+
+  // บันทึกแล้ว แต่มีเกมค้าง → ถามว่าจะเริ่มใหม่เลย หรือใช้ตั้งแต่เกม/ตาหน้า (ปิดหน้าต่าง = ใช้ตาหน้า)
+  function askNewNow(o) {
+    var done = false;
+    function later() {
+      if (done) return;
+      done = true;
+      toast('บันทึกแล้ว · มีผลตั้งแต่ตาหน้า', 2200);
+      if (o.later) o.later();
+    }
+    sheet({
+      title: 'เริ่มเกมใหม่เลยไหม',
+      text: o.askText || 'ค่าที่เปลี่ยนจะมีผลเมื่อเริ่มเกมใหม่ · ถ้าเริ่มตอนนี้ เกมที่เล่นค้างอยู่จะหายไป',
+      actions: [
+        { label: 'ใช้ตาหน้า', onClick: later },
+        {
+          label: 'เริ่มใหม่เลย',
+          primary: true,
+          onClick: function () {
+            done = true;
+            if (o.restart) o.restart();
+          }
+        }
+      ],
+      onDismiss: later
+    });
+  }
+
+  // ปุ่ม ↻ เริ่มเกมใหม่: เล่นค้างอยู่ → ถามก่อน · ไม่ค้าง → เริ่มเลย
+  // o = { inProgress(), restart(), title?, text?, go? }
+  function confirmNew(o) {
+    if (!o.inProgress || !o.inProgress()) {
+      o.restart();
+      return;
+    }
+    sheet({
+      title: o.title || 'เริ่มเกมใหม่?',
+      text: o.text || 'เกมที่เล่นอยู่จะหายไป',
+      actions: [{ label: 'ยกเลิก' }, { label: o.go || 'เริ่มใหม่', primary: true, onClick: o.restart }]
+    });
+  }
+
+  function wireSettings(root) {
+    (root || document).querySelectorAll('[data-settings]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        if (openSheet) return;
+        window.FG.openSettings();
+      });
+    });
+  }
+
   /* ---------- boot ---------- */
   applyGap();
   var gapTimer = 0;
@@ -488,6 +623,7 @@
   applyTheme(getTheme());
   fillIcons(document);
   wireHowto(document);
+  wireSettings(document);
   document.addEventListener('gesturestart', function (e) {
     e.preventDefault();
   });
@@ -505,6 +641,14 @@
     closeSheet: closeSheet,
     choice: choice,
     label: label,
+    group: group,
+    gapGroup: gapGroup,
+    settings: settings,
+    confirmNew: confirmNew,
+    // ปุ่ม ⚙️ เรียกตัวนี้ — เกมที่มีตัวเลือกของตัวเองแทนที่ได้
+    openSettings: function () {
+      return settings();
+    },
     swipe: swipe,
     fmtTime: fmtTime,
     fmtNum: fmtNum,

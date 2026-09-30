@@ -25,8 +25,12 @@
   var bestEl = document.getElementById('best');
   var speedNameEl = document.getElementById('speed-name');
 
-  var speed = FG.store.get('snake:speed', 'mid');
-  if (!SPEEDS[speed]) speed = 'mid';
+  // ความเร็วที่ตั้งไว้ ('snake:speed') · speed = ความเร็วของตาที่กำลังเล่น (เปลี่ยนกลางตาแล้วเลือก "ใช้ตาหน้า" จะยังไม่เปลี่ยน)
+  function prefSpeed() {
+    var s = FG.store.get('snake:speed', 'mid');
+    return SPEEDS[s] ? s : 'mid';
+  }
+  var speed = prefSpeed();
   var status = 'ready'; // ready | play | paused | over
   var snake, dir, queue, food, score, rows, cell, timer, colors;
 
@@ -118,6 +122,7 @@
   }
 
   function start() {
+    speed = prefSpeed();
     reset();
     status = 'play';
     overlay.hidden = true;
@@ -227,27 +232,74 @@
   }
 
   /* ---------- overlay ---------- */
-  var speedChoice = FG.choice(
-    Object.keys(SPEEDS).map(function (k) {
-      return { value: k, label: SPEEDS[k].label };
-    }),
-    speed,
-    function (v) {
-      speed = v;
-      FG.store.set('snake:speed', v);
-      paintScore();
-    }
-  );
-  ovSpeed.appendChild(speedChoice);
+  var SPEED_CHOICES = Object.keys(SPEEDS).map(function (k) {
+    return { value: k, label: SPEEDS[k].label };
+  });
+
+  // ตัวเลือกความเร็วบนหน้าทับ (ก่อนเริ่ม/หลังจบ) — ตรงกับค่าที่ตั้งไว้เสมอ
+  function paintSpeedChoice() {
+    ovSpeed.innerHTML = '';
+    ovSpeed.appendChild(
+      FG.choice(SPEED_CHOICES, prefSpeed(), function (v) {
+        FG.store.set('snake:speed', v);
+        speed = v;
+        paintScore();
+      })
+    );
+  }
+  paintSpeedChoice();
 
   function showOverlay(title, text, go, withSpeed) {
     ovTitle.textContent = title;
     ovText.textContent = text;
     ovGo.lastChild.textContent = go;
+    if (withSpeed) paintSpeedChoice();
     ovSpeed.hidden = !withSpeed;
     overlay.hidden = false;
     ovGo.focus({ preventScroll: true });
   }
+
+  function showReady() {
+    status = 'ready';
+    clearTimeout(timer);
+    timer = 0;
+    speed = prefSpeed();
+    reset();
+    setPauseIcon();
+    pauseBtn.disabled = true;
+    showOverlay('งู', 'ปัดนิ้วบนสนาม หรือกดปุ่มลูกศรด้านล่าง · ชนกำแพงหรือตัวเองแล้วจบ', 'เริ่มเล่น', true);
+  }
+
+  // ⚙️: ความเร็ว (เปลี่ยนกลางตา → ถามเริ่มใหม่ / ใช้ตาหน้า) · เปิดตอนกำลังเล่น = หยุดเกมก่อน
+  FG.openSettings = function () {
+    pause();
+    var cur = prefSpeed();
+    var sp = cur;
+    FG.settings({
+      build: function (body) {
+        body.appendChild(
+          FG.group(
+            'ความเร็ว',
+            FG.choice(SPEED_CHOICES, sp, function (v) {
+              sp = v;
+            }),
+            'สถิติแยกตามความเร็ว'
+          )
+        );
+      },
+      needsNew: function () {
+        return sp !== speed;
+      },
+      save: function () {
+        FG.store.set('snake:speed', sp);
+      },
+      inProgress: function () {
+        return status === 'paused' || status === 'play';
+      },
+      // ยังไม่เริ่ม/จบแล้ว = เปลี่ยนความเร็วบนหน้าเริ่มเลย · เล่นค้าง = กลับไปหน้าเริ่ม (ไม่ออกตัวเอง)
+      restart: showReady
+    });
+  };
 
   function setPauseIcon() {
     var paused = status !== 'play';
@@ -306,9 +358,6 @@
   });
 
   /* ---------- boot ---------- */
-  reset();
   saveHub();
-  setPauseIcon();
-  pauseBtn.disabled = true;
-  showOverlay('งู', 'ปัดนิ้วบนสนาม หรือกดปุ่มลูกศรด้านล่าง · ชนกำแพงหรือตัวเองแล้วจบ', 'เริ่มเล่น', true);
+  showReady();
 })();

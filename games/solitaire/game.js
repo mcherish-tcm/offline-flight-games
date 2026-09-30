@@ -252,7 +252,7 @@
         FG.sheet({
           title: 'ชนะแล้ว!',
           text: 'ย้าย ' + S.moves + ' ครั้ง · ' + FG.fmtTime(S.seconds) + (isBest ? ' — เร็วที่สุดของเรา' : '') + ' · ชนะรวม ' + st.wins + ' ครั้ง',
-          actions: [{ label: 'ดูโต๊ะ' }, { label: 'แจกใหม่', primary: true, onClick: function () { deal(S.draw); } }]
+          actions: [{ label: 'ดูโต๊ะ' }, { label: 'แจกใหม่', primary: true, onClick: function () { deal(prefDraw()); } }]
         });
       }, 400);
     }
@@ -500,38 +500,62 @@
 
   undoBtn.addEventListener('click', undo);
   autoBtn.addEventListener('click', autoComplete);
+  // แบบการจั่วที่ตั้งไว้ (⚙️) — ปุ่ม ↻ และ "แจกใหม่" ใช้ค่านี้
+  function prefDraw() {
+    return FG.store.get('sol:draw', 1) === 3 ? 3 : 1;
+  }
+
+  function inProgress() {
+    return !!S && S.started && !S.done;
+  }
+
+  // ↻ = แจกใหม่ด้วยแบบการจั่วที่ตั้งไว้
   document.getElementById('new').addEventListener('click', function () {
-    var draw = S ? S.draw : 1;
-    var body = document.createElement('div');
-    body.appendChild(FG.label('แบบการจั่ว'));
-    body.appendChild(
-      FG.choice(
-        [
-          { value: 1, label: 'จั่วทีละ 1 (ง่าย)' },
-          { value: 3, label: 'จั่วทีละ 3' }
-        ],
-        draw,
-        function (v) {
-          draw = v;
-        }
-      )
-    );
-    FG.sheet({
+    FG.confirmNew({
+      inProgress: inProgress,
+      restart: function () {
+        deal(prefDraw());
+      },
       title: 'แจกไพ่ใหม่?',
-      text: S && S.started && !S.done ? 'ตาที่เล่นอยู่จะหายไป' : '',
-      body: body,
-      actions: [
-        { label: 'ยกเลิก' },
-        {
-          label: 'แจกใหม่',
-          primary: true,
-          onClick: function () {
-            deal(draw);
-          }
-        }
-      ]
+      text: 'ตาที่เล่นอยู่จะหายไป',
+      go: 'แจกใหม่'
     });
   });
+
+  // ⚙️: จั่วทีละ 1 / 3 (แจกใหม่จึงมีผล)
+  FG.openSettings = function () {
+    var cur = prefDraw();
+    var draw = cur;
+    FG.settings({
+      build: function (body) {
+        body.appendChild(
+          FG.group(
+            'แบบการจั่ว',
+            FG.choice(
+              [
+                { value: 1, label: 'จั่วทีละ 1 (ง่าย)' },
+                { value: 3, label: 'จั่วทีละ 3' }
+              ],
+              draw,
+              function (v) {
+                draw = v;
+              }
+            )
+          )
+        );
+      },
+      needsNew: function () {
+        return draw !== cur;
+      },
+      save: function () {
+        FG.store.set('sol:draw', draw);
+      },
+      inProgress: inProgress,
+      restart: function () {
+        deal(draw);
+      }
+    });
+  };
   document.addEventListener('keydown', function (e) {
     if (e.key === 'z' || e.key === 'u') undo();
     if (e.key === ' ' || e.key === 'd') {

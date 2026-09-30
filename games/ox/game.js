@@ -110,6 +110,7 @@
   function nextRound() {
     FG.closeSheet();
     duo.cancelCPU();
+    duo.newRound();
     S = fresh(1 - S.starter);
     render();
     save();
@@ -119,6 +120,7 @@
   function restartRound() {
     FG.closeSheet();
     duo.cancelCPU();
+    duo.newRound();
     S = fresh(S.starter);
     render();
     save();
@@ -175,7 +177,8 @@
     });
   });
 
-  document.getElementById('settings').addEventListener('click', function () {
+  // ⚙️ (ปุ่มเฟืองบนแถบหัว — app.js ผูกปุ่มให้แล้ว)
+  FG.openSettings = function () {
     duo.openSettings({
       onReset: save,
       hasProgress: function () {
@@ -188,7 +191,7 @@
         cpuTurn();
       }
     });
-  });
+  };
 
   document.addEventListener('keydown', function (e) {
     var n = parseInt(e.key, 10);

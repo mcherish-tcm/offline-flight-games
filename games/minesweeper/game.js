@@ -148,7 +148,7 @@
       FG.sheet({
         title: 'โดนระเบิด',
         text: 'ลองใหม่อีกตานะ — แตะแรกของทุกเกมปลอดภัยเสมอ',
-        actions: [{ label: 'ดูกระดาน' }, { label: 'เล่นอีกครั้ง', primary: true, onClick: function () { newGame(S.size); } }]
+        actions: [{ label: 'ดูกระดาน' }, { label: 'เล่นอีกครั้ง', primary: true, onClick: function () { newGame(prefSize()); } }]
       });
     }, 600);
   }
@@ -178,7 +178,7 @@
       FG.sheet({
         title: 'เคลียร์หมดแล้ว!',
         text: 'ขนาด' + SIZES[S.size].label + ' ใช้เวลา ' + FG.fmtTime(S.seconds) + (isBest ? ' — เร็วที่สุดของขนาดนี้' : ''),
-        actions: [{ label: 'ดูกระดาน' }, { label: 'เล่นอีกครั้ง', primary: true, onClick: function () { newGame(S.size); } }]
+        actions: [{ label: 'ดูกระดาน' }, { label: 'เล่นอีกครั้ง', primary: true, onClick: function () { newGame(prefSize()); } }]
       });
     }, 300);
   }
@@ -322,30 +322,67 @@
     if (e.key === 'f') setMode(!flagMode);
   });
 
-  function askNew() {
-    var bests = FG.store.get(BEST, {});
-    var list = document.createElement('div');
-    list.className = 'ms-sizes';
-    Object.keys(SIZES).forEach(function (k) {
-      var z = SIZES[k];
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'btn';
-      b.innerHTML =
-        '<span>' + z.label + ' · ' + z.cols + '×' + z.rows + ' · ระเบิด ' + z.mines + '</span><span>' + (bests[k] ? FG.fmtTime(bests[k]) : '') + '</span>';
-      b.addEventListener('click', function () {
-        newGame(k);
-      });
-      list.appendChild(b);
-    });
-    FG.sheet({
-      title: 'เกมใหม่ — เลือกขนาด',
-      text: S && S.status === 'play' ? 'เกมที่เล่นอยู่จะหายไป' : '',
-      body: list,
-      actions: [{ label: 'ยกเลิก' }]
-    });
+  // ขนาดที่ตั้งไว้ (⚙️) — ปุ่ม ↻ และ "เล่นอีกครั้ง" ใช้ขนาดนี้
+  function prefSize() {
+    var s = FG.store.get('mines:size', 's');
+    return SIZES[s] ? s : 's';
   }
-  document.getElementById('new').addEventListener('click', askNew);
+
+  function inProgress() {
+    return !!S && S.status === 'play';
+  }
+
+  // ↻ = เกมใหม่ขนาดที่ตั้งไว้
+  document.getElementById('new').addEventListener('click', function () {
+    FG.confirmNew({
+      inProgress: inProgress,
+      restart: function () {
+        newGame(prefSize());
+      }
+    });
+  });
+
+  // ⚙️: ขนาดกระดาน (เริ่มเกมใหม่จึงมีผล) · บอกเวลาเร็วสุดของแต่ละขนาดไว้ด้วย
+  FG.openSettings = function () {
+    var cur = prefSize();
+    var size = cur;
+    var bests = FG.store.get(BEST, {});
+    FG.settings({
+      build: function (body) {
+        var hint = Object.keys(SIZES)
+          .map(function (k) {
+            var z = SIZES[k];
+            return z.label + ' ' + z.cols + '×' + z.rows + ' ระเบิด ' + z.mines + (bests[k] ? ' (เร็วสุด ' + FG.fmtTime(bests[k]) + ')' : '');
+          })
+          .join(' · ');
+        body.appendChild(
+          FG.group(
+            'ขนาดกระดาน',
+            FG.choice(
+              Object.keys(SIZES).map(function (k) {
+                return { value: k, label: SIZES[k].label };
+              }),
+              size,
+              function (v) {
+                size = v;
+              }
+            ),
+            hint
+          )
+        );
+      },
+      needsNew: function () {
+        return size !== cur;
+      },
+      save: function () {
+        FG.store.set('mines:size', size);
+      },
+      inProgress: inProgress,
+      restart: function () {
+        newGame(size);
+      }
+    });
+  };
 
   /* ---------- boot ---------- */
   var saved = FG.store.get(KEY, null);

@@ -162,7 +162,7 @@
   /* ---------- actions ---------- */
   function doRoll() {
     if (S.over && !FG.isSheetOpen()) {
-      newGame(S.duo);
+      next();
       return;
     }
     if (rolling || !D.canRoll(S) || FG.isSheetOpen()) return;
@@ -274,7 +274,7 @@
         FG.sheet({
           title: 'ได้ ' + t[0] + ' แต้ม',
           text: isBest ? 'สูงสุดของเรา!' : 'ดีสุด ' + best + ' แต้ม',
-          actions: [{ label: 'ดูตาราง' }, { label: 'เล่นใหม่', primary: true, onClick: function () { newGame(false); } }]
+          actions: [{ label: 'ดูตาราง' }, { label: 'เล่นใหม่', primary: true, onClick: next }]
         });
       }, 500);
       return;
@@ -289,7 +289,7 @@
       FG.sheet({
         title: w === 'draw' ? 'เสมอ' : NAMES[w] + ' ชนะ!',
         text: 'แดง ' + t[0] + ' · ฟ้า ' + t[1] + ' แต้ม<br>สกอร์รวม: แดง ' + sc.w[0] + ' · ฟ้า ' + sc.w[1] + ' · เสมอ ' + sc.d,
-        actions: [{ label: 'ดูตาราง' }, { label: 'เล่นตาต่อไป', primary: true, onClick: function () { newGame(true); } }]
+        actions: [{ label: 'ดูตาราง' }, { label: 'เล่นตาต่อไป', primary: true, onClick: next }]
       });
     }, 500);
   }
@@ -300,43 +300,64 @@
   });
   rollBtn.addEventListener('click', doRoll);
 
-  document.getElementById('new').addEventListener('click', function () {
-    var isDuo = S.duo;
-    var body = document.createElement('div');
-    body.appendChild(FG.label('โหมด'));
-    body.appendChild(
-      FG.choice(
-        [
-          { value: false, label: 'คนเดียว' },
-          { value: true, label: '2 คนผลัดกัน' }
-        ],
-        isDuo,
-        function (v) {
-          isDuo = v;
-        }
-      )
+  // โหมดที่ตั้งไว้ (⚙️) — เกมใหม่/ตาต่อไปใช้ค่านี้
+  function prefDuo() {
+    var p = FG.store.get('dice:pref', null);
+    return !!(p && p.duo);
+  }
+
+  function next() {
+    newGame(prefDuo());
+  }
+
+  function inProgress() {
+    return (
+      !S.over &&
+      S.cards.some(function (c) {
+        return c.s.some(function (v) {
+          return v != null;
+        });
+      })
     );
-    var started = S.cards.some(function (c) {
-      return c.s.some(function (v) {
-        return v != null;
-      });
-    });
-    FG.sheet({
-      title: 'เกมใหม่',
-      text: started && !S.over ? 'เกมที่เล่นอยู่จะหายไป' : '',
-      body: body,
-      actions: [
-        { label: 'ยกเลิก' },
-        {
-          label: 'เริ่ม',
-          primary: true,
-          onClick: function () {
-            newGame(isDuo);
-          }
-        }
-      ]
-    });
+  }
+
+  // ↻ = เกมใหม่ด้วยโหมดที่ตั้งไว้
+  document.getElementById('new').addEventListener('click', function () {
+    FG.confirmNew({ inProgress: inProgress, restart: next });
   });
+
+  // ⚙️: คนเดียว / 2 คนผลัดกัน (เริ่มเกมใหม่จึงมีผล)
+  FG.openSettings = function () {
+    var cur = prefDuo();
+    var isDuo = cur;
+    FG.settings({
+      build: function (body) {
+        body.appendChild(
+          FG.group(
+            'โหมด',
+            FG.choice(
+              [
+                { value: false, label: 'คนเดียว' },
+                { value: true, label: '2 คนผลัดกัน' }
+              ],
+              isDuo,
+              function (v) {
+                isDuo = v;
+              }
+            )
+          )
+        );
+      },
+      needsNew: function () {
+        return isDuo !== cur;
+      },
+      save: function () {
+        FG.store.set('dice:pref', { duo: isDuo });
+      },
+      inProgress: inProgress,
+      restart: next
+    });
+  };
 
   document.addEventListener('keydown', function (e) {
     if (e.key === ' ' || e.key === 'r') {

@@ -152,7 +152,28 @@
     return S.done.length === 8;
   }
 
+  // v8: ตอนเปิดเกม — มีตาที่เล่นค้าง (บันทึกไว้ ยังไม่จบ) ให้เล่นต่อไหม · ไม่มี = ถาม "เล่นกี่ดอก" ก่อนแจก
+  // saved = ค่าจาก localStorage ('sp:state') = { g: { s, moves, seconds, started, done }, h }
+  function canResume(saved) {
+    return !!(
+      saved &&
+      saved.g &&
+      saved.g.s &&
+      Array.isArray(saved.g.s.cols) &&
+      saved.g.s.cols.length === 10 &&
+      SUIT_SETS[saved.g.s.suits] &&
+      !saved.g.done
+    );
+  }
+
+  // จำนวนดอกที่ตั้งไว้ ('sp:suits') → 1 / 2 / 4 (ค่าแปลก = 1)
+  function cleanSuits(v) {
+    return v === 2 || v === 4 ? v : 1;
+  }
+
   return {
+    canResume: canResume,
+    cleanSuits: cleanSuits,
     SUIT_SETS: SUIT_SETS,
     rank: rank,
     suitOf: suitOf,
