@@ -2,7 +2,7 @@
  * ชิงเมืองแดนมนตร์ — กติกาล้วน + คอม · ใช้ได้ทั้งในเบราว์เซอร์ (window.Realm) และใน node (require)
  *
  * เกมกระดานแนว RPG แฟนตาซี (คิดขึ้นเองทั้งหมด): เดินรอบกระดาน (2 แผนที่: 30 ช่อง / 24 ช่อง) ทอยเต๋า 1–6 เดินหน้า
- * ตีมอนสเตอร์เก็บเงิน/ค่าประสบการณ์ · ปราบผู้เฝ้าเมืองเพื่อยึดเมือง · คนอื่นตกเมืองเรา = จ่ายค่าผ่านทาง
+ * ตีมอนสเตอร์เก็บเงิน/ค่าประสบการณ์ · ปราบผู้เฝ้าเมืองเพื่อยึดเมือง · คนอื่นตกเมืองเรา = เลือก พักค้างคืน (จ่ายค่าผ่านทาง) หรือ ปล้นเมือง (ทอยเต๋าแข่ง · v9)
  * ตกเมืองตัวเอง = ลงทุนขยายเมือง · ศาลาเสี่ยงทาย = เปิดไพ่เหตุการณ์ · ครบจำนวนรอบ = นับ เงิน + มูลค่าเมือง มากสุดชนะ
  *
  * สถานะเกม (s) เป็น object ธรรมดา แปลงเป็น JSON ได้ทั้งก้อน (บันทึกทุกตา) · สุ่มด้วย s.seed ในตัว (เล่นซ้ำได้เหมือนเดิม)
@@ -10,11 +10,11 @@
  *   ทุกที่ที่อ้าง "เมืองที่ k" (pending.town, battle.town, action.town) = ลำดับใน s.towns ไม่ใช่ลำดับใน TOWNS
  * ทุกการกระทำผ่าน act(s, action) → คืนรายการเหตุการณ์ (events) ให้หน้าจอเอาไปแสดง
  * ใครต้องตัดสินใจตอนนี้ = decider(s) · คอมเลือกให้ = cpuAct(s)
- * เซฟรุ่นเก่า (s.v = 1 · ยังไม่มีแผนที่) → migrate(s) แปลงเป็นรุ่นปัจจุบัน (แผนที่ดั้งเดิม)
+ * เซฟรุ่นเก่า (s.v = 1 · ยังไม่มีแผนที่ / s.v = 2 · ก่อน v9) → migrate(s) แปลงเป็นรุ่นปัจจุบัน
  *
  * ช่วง (s.phase):
  *   'roll'   — รอทอยเต๋า (ใช้ยา/รองเท้าก่อนทอยได้)
- *   'decide' — รอเลือก: s.pending.kind = 'duel-offer' | 'town' | 'invest' | 'shop'
+ *   'decide' — รอเลือก: s.pending.kind = 'duel-offer' | 'town' | 'visit' (เมืองคนอื่น: พัก/ปล้น) | 'invest' | 'shop'
  *   'battle' — กำลังสู้มอนสเตอร์/ผู้เฝ้าเมือง (s.battle) เลือกท่าทีละยก
  *   'duel'   — ประลองระหว่างผู้เล่น (s.duel) ต่างคนต่างวางแผน 3 ท่าลับ ๆ
  *   'over'   — จบเกม (s.result)
@@ -26,7 +26,7 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = 2; // รุ่นของสถานะที่บันทึก (1 = ก่อนมีแผนที่/ไพ่/เครื่องราง)
+  var VERSION = 3; // รุ่นของสถานะที่บันทึก (1 = ก่อนมีแผนที่/ไพ่/เครื่องราง · 2 = ก่อนมีพัก/ปล้นเมือง + ของช่วยรบ)
 
   /* ---------- ตัวเลขหลัก (ปรับสมดุลตรงนี้ · ผลจำลองอยู่ใน tests/realm-sim.js) ---------- */
   var LENGTHS = { short: 15, mid: 22, long: 30 }; // จำนวนรอบ (ทุกคนเล่นคนละ 1 ตา = 1 รอบ)
@@ -52,7 +52,18 @@
   var MAX_BOMB = 2;
   var MAX_BOOTS = 2;
   var MAX_WARD = 1;
+  var MAX_OIL = 2;
+  var MAX_BUCKLER = 2;
+  var MAX_SCROLL = 2;
   var BOMB_DMG = 14; // ระเบิดประกายไฟ: แรงคงที่ ไม่หักป้องกัน อีกฝ่ายไม่ได้สวน
+  var OIL_ATK = 6; // น้ำมันเคลือบดาบ: โจมตี +6 จนจบการต่อสู้/ประลองครั้งนั้น
+  /* ตกเมืองคนอื่น (v9): เลือก พักค้างคืน (จ่ายค่าผ่านทาง พลังชีวิตเต็ม) หรือ ปล้นเมือง (ทอยเต๋าแข่งกับเจ้าเมือง)
+   * ปล้นสำเร็จ = เจ้าเมืองจ่ายให้ 3 เท่าของค่าผ่านทาง (ไม่เกินเงินที่เจ้าเมืองมี) · ไม่สำเร็จ (เสมอ = เจ้าเมืองชนะ) = จ่ายค่าปรับ 2 เท่า
+   * ROB_BONUS[ระดับเมือง] = แต้มที่เจ้าเมืองได้บวกเพิ่มตอนทอยสู้คนปล้น (เมืองระดับสูงคุ้มกันแน่นกว่า) */
+  var ROB_WIN = 3;
+  var ROB_LOSE = 2;
+  // ระดับ 1 = 0 (โอกาสปล้นสำเร็จ 42%) · ระดับ 2–3 = +1 (28%) · ระดับ 4–5 = +2 (17%) — ผลจำลองเทียบหลายแบบอยู่ใน docs/realm-rules.md
+  var ROB_BONUS = [0, 0, 1, 1, 2, 2];
   var FEST_MULT = 2; // เทศกาลโคมลอย: ค่าผ่านทาง ×2 ครบหนึ่งรอบ
   var SEAL_RATE = 0.5; // เครื่องรางตราผ่านแดน: จ่ายค่าผ่านทางแค่ครึ่งเดียว
   var PURSE_BONUS = 30; // เครื่องรางเหรียญมังกร: เงินหลวงเพิ่ม
@@ -179,13 +190,18 @@
     { name: 'ดาบเหล็กกล้า', atk: 3, price: 70 },
     { name: 'ดาบเงินจันทร์', atk: 6, price: 170 },
     { name: 'ขวานศิลาอัคคี', atk: 9, price: 290 },
-    { name: 'ดาบดาวตกสีคราม', atk: 13, price: 440 }
+    { name: 'ดาบดาวตกสีคราม', atk: 13, price: 440 },
+    // v9: 2 ขั้นบนสุด (แพงมาก ส่วนใหญ่ซื้อได้ช่วงท้ายเกมยาว · เผื่อสู้ของใหญ่ในรุ่นหน้า)
+    { name: 'หอกสายฟ้าพิโรธ', atk: 18, price: 640 },
+    { name: 'ดาบตะวันนิรันดร์', atk: 24, price: 900 }
   ];
   var ARMORS = [
     { name: 'เสื้อหนังแรด', def: 2, price: 60 },
     { name: 'เกราะเกล็ดเงิน', def: 4, price: 150 },
     { name: 'เกราะกระดองเต่ายักษ์', def: 6, price: 260 },
-    { name: 'ชุดเกราะขนนกฟ้า', def: 9, price: 400 }
+    { name: 'ชุดเกราะขนนกฟ้า', def: 9, price: 400 },
+    { name: 'เกราะเกล็ดมังกรแดง', def: 12, price: 580 },
+    { name: 'เกราะแสงจันทร์ศักดิ์สิทธิ์', def: 16, price: 820 }
   ];
   // เครื่องราง: ใส่ได้ครั้งละ 1 ชิ้น · ซื้อชิ้นใหม่ = เปลี่ยนแทนชิ้นเดิม (ไม่คืนเงิน)
   var CHARMS = [
@@ -199,9 +215,14 @@
     smoke: { name: 'ลูกควันหนีภัย', price: 25, max: MAX_SMOKE, note: 'หนีออกจากการต่อสู้' },
     bomb: { name: 'ระเบิดประกายไฟ', price: 35, max: MAX_BOMB, note: 'ระหว่างสู้: แรง ' + BOMB_DMG + ' ทันที อีกฝ่ายไม่ได้สวน' },
     boots: { name: 'รองเท้าลมกรด', price: 30, max: MAX_BOOTS, note: 'ก่อนทอย: ตานี้ทอยเต๋า 2 ลูก' },
-    ward: { name: 'ยันต์กันเคราะห์', price: 30, max: MAX_WARD, note: 'กันไพ่ร้าย 1 ครั้ง หรือกันเหรียญหล่นตอนแพ้' }
+    ward: { name: 'ยันต์กันเคราะห์', price: 30, max: MAX_WARD, note: 'กันไพ่ร้าย 1 ครั้ง หรือกันเหรียญหล่นตอนแพ้' },
+    // v9 ของช่วยรบ: ใช้ระหว่างสู้ได้ฟรี ไม่เสียยก อีกฝ่ายไม่ได้สวน · ใช้ได้ชนิดละครั้งต่อการต่อสู้
+    oil: { name: 'น้ำมันเคลือบดาบ', short: 'น้ำมันดาบ', price: 35, max: MAX_OIL, fight: true, note: 'ระหว่างสู้/ประลอง: โจมตี +' + OIL_ATK + ' จนจบการต่อสู้นั้น' },
+    buckler: { name: 'โล่ไม้ไผ่สาน', short: 'โล่ไม้', price: 30, max: MAX_BUCKLER, fight: true, note: 'ระหว่างสู้/ประลอง: กันการโดนตีได้ 1 ครั้ง (ไม่เจ็บเลย)' },
+    scroll: { name: 'ม้วนคัมภีร์อ่านใจ', short: 'คัมภีร์', price: 30, max: MAX_SCROLL, fight: true, note: 'สู้มอนสเตอร์/ผู้เฝ้า: รู้ท่าที่อีกฝ่ายจะออกยกถัดไป' }
   };
-  var ITEM_IDS = ['potion', 'smoke', 'bomb', 'boots', 'ward'];
+  var ITEM_IDS = ['potion', 'smoke', 'bomb', 'boots', 'ward', 'oil', 'buckler', 'scroll'];
+  var FIGHT_ITEMS = ['oil', 'buckler', 'scroll'];
 
   /* ---------- ไพ่เหตุการณ์ (ศาลาเสี่ยงทาย) 16 ใบ: ดี 10 · ร้าย 6 · คิดขึ้นเองทั้งหมด ----------
    * ไพ่ร้ายทุกใบมีเพดาน (เสียไม่เกิน 60 ต่อคน) · ยันต์กันเคราะห์กันไพ่ร้ายได้ */
@@ -292,12 +313,27 @@
       bomb: 0,
       boots: 0,
       ward: 0,
+      oil: 0,
+      buckler: 0,
+      scroll: 0,
       fast: false,
       laps: 0,
       bank: false,
       skip: 0,
-      st: { wins: 0, losses: 0, broke: 0, tollPaid: 0, tollGot: 0, duelsWon: 0, captured: 0, cards: 0 }
+      st: newStats()
     };
+  }
+
+  /* สถิติต่อคน · tollPaid/tollGot = ค่าผ่านทางจากการพักค้างคืน
+   * ปล้นเมือง (ฝั่งคนปล้น): robTry ครั้งที่ลอง · robWin สำเร็จ · robGot เงินที่ได้ · robLost ค่าปรับที่เสีย
+   * ปล้นเมือง (ฝั่งเจ้าเมือง): defGot ค่าปรับที่ได้จากคนปล้นไม่สำเร็จ · defLost เงินที่โดนปล้นไป */
+  var ROB_STATS = ['robTry', 'robWin', 'robGot', 'robLost', 'defGot', 'defLost'];
+  function newStats() {
+    var st = { wins: 0, losses: 0, broke: 0, tollPaid: 0, tollGot: 0, duelsWon: 0, captured: 0, cards: 0 };
+    ROB_STATS.forEach(function (k) {
+      st[k] = 0;
+    });
+    return st;
   }
 
   function atkOf(p) {
@@ -429,21 +465,36 @@
   function migrate(s) {
     if (!s || typeof s !== 'object' || !Array.isArray(s.players) || !Array.isArray(s.board) || !Array.isArray(s.towns)) return null;
     if (s.v === VERSION) return MAPS[s.map] ? s : null;
-    if (s.v !== 1) return null;
-    var M = MAPS.legacy;
-    if (s.board.length !== M.layout.length || s.towns.length !== M.towns.length) return null;
-    s.map = M.id;
-    s.board = buildBoard(M); // เมือง/ช่องอื่นตำแหน่งเดิมทุกช่อง
-    s.fest = 0;
-    s.deck = [];
+    if (s.v !== 1 && s.v !== 2) return null;
+    if (s.v === 1) {
+      var M = MAPS.legacy;
+      if (s.board.length !== M.layout.length || s.towns.length !== M.towns.length) return null;
+      s.map = M.id;
+      s.board = buildBoard(M); // เมือง/ช่องอื่นตำแหน่งเดิมทุกช่อง
+      s.fest = 0;
+      s.deck = [];
+      s.players.forEach(function (p) {
+        if (p.ch == null) p.ch = -1;
+        ['bomb', 'boots', 'ward'].forEach(function (k) {
+          if (p[k] == null) p[k] = 0;
+        });
+        p.fast = false;
+        if (p.st && p.st.cards == null) p.st.cards = 0;
+      });
+      s.v = 2;
+    }
+    // รุ่น 2 → 3: ของช่วยรบ 3 ชนิด + สถิติปล้นเมือง (อาวุธ/เกราะขั้นเดิมอยู่ลำดับเดิม ขั้นใหม่ต่อท้าย)
+    if (!MAPS[s.map]) return null;
     s.players.forEach(function (p) {
-      if (p.ch == null) p.ch = -1;
-      ['bomb', 'boots', 'ward'].forEach(function (k) {
+      FIGHT_ITEMS.forEach(function (k) {
         if (p[k] == null) p[k] = 0;
       });
-      p.fast = false;
-      if (p.st && p.st.cards == null) p.st.cards = 0;
+      if (!p.st) p.st = newStats();
+      ROB_STATS.forEach(function (k) {
+        if (p.st[k] == null) p.st[k] = 0;
+      });
     });
+    if (s.duel && !s.duel.items) s.duel.items = [[], []];
     s.v = VERSION;
     return s;
   }
@@ -702,12 +753,10 @@
             endTurn(s, out);
           }
         } else {
-          var fee = tollFor(s, t, pi);
-          var paid = pay(s, pi, t.owner, fee, out);
-          p.st.tollPaid += paid;
-          s.players[t.owner].st.tollGot += paid;
-          ev(out, 'toll', p.name + ' จ่ายค่าผ่านทาง' + T.name + ' ' + paid + ' เหรียญ ให้ ' + s.players[t.owner].name + (s.fest > 0 ? ' (เทศกาล ×2)' : ''), { p: pi, to: t.owner, v: paid });
-          endTurn(s, out);
+          // v9: ไม่มีการจ่ายบังคับ และไม่มีทางผ่านฟรี — ต้องเลือก พักค้างคืน หรือ ปล้นเมือง
+          s.phase = 'decide';
+          s.pending = { kind: 'visit', town: k };
+          ev(out, 'ask', p.name + ' แวะ' + T.name + ' เมืองของ ' + s.players[t.owner].name + ' — เลือก พักค้างคืน หรือ ปล้นเมือง', { p: pi, to: t.owner, town: k });
         }
         return;
       }
@@ -715,20 +764,131 @@
     endTurn(s, out);
   }
 
+  /* ---------- แวะเมืองคนอื่น: พักค้างคืน / ปล้นเมือง ---------- */
+  function robBonus(t) {
+    var b = ROB_BONUS[Math.max(0, Math.min(ROB_BONUS.length - 1, t.level))];
+    return b || 0;
+  }
+
+  // โอกาสปล้นสำเร็จ = ทอยของคนปล้น > ทอยเจ้าเมือง + แต้มบวก (เต๋า 1–6 ทั้งคู่ · เสมอ = เจ้าเมืองชนะ)
+  function robChance(t) {
+    var b = robBonus(t);
+    var n = 0;
+    for (var x = 1; x <= 6; x++) for (var y = 1; y <= 6; y++) if (x > y + b) n++;
+    return n / 36;
+  }
+
+  // ตัวเลขที่หน้าจอ/คอมใช้ตัดสินใจ: ค่าพัก (= ค่าผ่านทางตอนนี้ รวมเทศกาล/ตราผ่านแดน) · ปล้นได้ · ปล้นเสีย
+  function visitInfo(s, k, pi) {
+    var t = s.towns[k];
+    var fee = tollFor(s, t, pi);
+    return {
+      town: k,
+      owner: t.owner,
+      fee: fee,
+      win: fee * ROB_WIN,
+      lose: fee * ROB_LOSE,
+      bonus: robBonus(t),
+      chance: robChance(t)
+    };
+  }
+
+  function restAt(s, out) {
+    var pi = s.turn;
+    var p = s.players[pi];
+    var k = s.pending.town;
+    var t = s.towns[k];
+    var T = TOWNS[t.i];
+    var fee = tollFor(s, t, pi);
+    var paid = pay(s, pi, t.owner, fee, out); // เงินไม่พอ = จ่ายเท่าที่มี (นับหมดตัว) แต่ยังได้พัก
+    p.st.tollPaid += paid;
+    s.players[t.owner].st.tollGot += paid;
+    p.hp = p.mhp;
+    ev(out, 'toll', p.name + ' พักค้างคืนที่' + T.name + ' จ่ายค่าผ่านทาง ' + paid + ' เหรียญ ให้ ' + s.players[t.owner].name + (s.fest > 0 ? ' (เทศกาล ×2)' : '') + ' · พลังชีวิตเต็ม', {
+      p: pi,
+      to: t.owner,
+      v: paid,
+      town: k
+    });
+    endTurn(s, out);
+  }
+
+  function robTown(s, out) {
+    var pi = s.turn;
+    var p = s.players[pi];
+    var k = s.pending.town;
+    var t = s.towns[k];
+    var T = TOWNS[t.i];
+    var oi = t.owner;
+    var o = s.players[oi];
+    var fee = tollFor(s, t, pi);
+    var bonus = robBonus(t);
+    var a = rint(s, 1, 6); // คนปล้นทอย
+    var b = rint(s, 1, 6); // เจ้าเมืองทอย (อัตโนมัติ แม้เป็นคน)
+    var ok = a > b + bonus;
+    var v;
+    p.st.robTry += 1;
+    var dice = ' (ทอย ' + a + ' ต่อ ' + b + (bonus ? ' +' + bonus : '') + ')';
+    if (ok) {
+      // เจ้าเมืองจ่าย 3 เท่า ไม่เกินเงินที่มี (เจ้าเมืองไม่นับว่าหมดตัว)
+      v = Math.min(o.gold, fee * ROB_WIN);
+      o.gold -= v;
+      p.gold += v;
+      p.st.robWin += 1;
+      p.st.robGot += v;
+      o.st.defLost += v;
+      ev(out, 'rob', p.name + ' ปล้น' + T.name + 'สำเร็จ' + dice + ' — ได้ ' + v + ' เหรียญจาก ' + o.name + (v < fee * ROB_WIN ? ' (เจ้าเมืองมีแค่นี้)' : ''), {
+        p: pi,
+        to: oi,
+        town: k,
+        a: a,
+        b: b,
+        bonus: bonus,
+        ok: true,
+        v: v,
+        fee: fee
+      });
+    } else {
+      // ไม่สำเร็จ = จ่ายค่าปรับ 2 เท่าให้เจ้าเมือง (เงินไม่พอ = จ่ายเท่าที่มี นับหมดตัว)
+      var later = []; // ข้อความ "หมดตัว" ให้ขึ้นหลังผลปล้น
+      v = pay(s, pi, oi, fee * ROB_LOSE, later);
+      p.st.robLost += v;
+      o.st.defGot += v;
+      ev(out, 'rob', p.name + ' ปล้น' + T.name + 'ไม่สำเร็จ' + dice + ' — เสียค่าปรับ ' + v + ' เหรียญ ให้ ' + o.name, {
+        p: pi,
+        to: oi,
+        town: k,
+        a: a,
+        b: b,
+        bonus: bonus,
+        ok: false,
+        v: v,
+        fee: fee
+      });
+      later.forEach(function (e) {
+        out.push(e);
+      });
+    }
+    endTurn(s, out);
+  }
+
   /* หีบสมบัติ (รวมถุงเงินเดิม): ครึ่งหนึ่งได้เงิน 20–60 (ท้ายเกมได้มากขึ้น) · อีกครึ่งได้ของใช้/พลังถาวรเล็กน้อย
    * ของเต็มกระเป๋าแล้ว = ได้เงินปลอบใจ 15–30 แทน (ไม่มีทางได้ของเกินเพดาน) */
-  var CHEST_W = [50, 14, 6, 7, 6, 5, 6, 6]; // [เงิน, ยา, ลูกควัน, ระเบิด, รองเท้า, ยันต์, ยาเสริมแรง, ผลโอ๊ก]
+  // v9: เพิ่มของช่วยรบ 3 ชนิด (ต่อท้าย) · ลดยา/ลูกควัน/ระเบิด/รองเท้า/ยันต์/พลังถาวรลงนิดหน่อย · เงินยังครึ่งหนึ่งเท่าเดิม
+  var CHEST_W = [50, 12, 5, 6, 5, 4, 5, 5, 3, 3, 2]; // [เงิน, ยา, ลูกควัน, ระเบิด, รองเท้า, ยันต์, ยาเสริมแรง, ผลโอ๊ก, น้ำมันดาบ, โล่ไม้, คัมภีร์]
+  var CHEST_GIVE = ['', 'potion', 'smoke', 'bomb', 'boots', 'ward', '', '', 'oil', 'buckler', 'scroll'];
   function openChest(s, out, frac) {
     var pi = s.turn;
     var p = s.players[pi];
     var r = pickWeighted(s, CHEST_W);
-    var give = ['', 'potion', 'smoke', 'bomb', 'boots', 'ward'][r];
+    var give = CHEST_GIVE[r];
     if (r === 0) {
       var g = rint(s, 20, 40) + Math.round((frac || 0) * 20);
       p.gold += g;
       ev(out, 'chest', p.name + ' เปิดหีบได้ ' + g + ' เหรียญ', { p: pi, v: g, got: 'gold' });
     } else if (give) {
-      if (p[give] < ITEMS[give].max) {
+      if ((p[give] || 0) < ITEMS[give].max) {
+        p[give] = p[give] || 0;
         p[give] += 1;
         ev(out, 'chest', p.name + ' เปิดหีบได้' + ITEMS[give].name + ' 1 ชิ้น', { p: pi, got: give });
       } else {
@@ -964,7 +1124,10 @@
       tier: foe.tier,
       bias: foe.bias.slice(),
       n: 0,
-      last: null
+      last: null,
+      oil: 0, // โจมตีที่เพิ่มจากน้ำมันเคลือบดาบ (ของเรา)
+      block: 0, // 1 = โล่ไม้พร้อมกันการโดนตีครั้งถัดไป
+      peek: null // ท่าที่อีกฝ่ายจะออกยกถัดไป (ม้วนคัมภีร์อ่านใจ)
     };
     var T = townIdx >= 0 ? townDef(s, townIdx) : null;
     var head = !T ? 'เจอ ' : up ? 'ขยาย' + T.name + 'เป็นระดับ ' + up + ' ต้องชนะ ' : 'ผู้เฝ้า' + T.name + ': ';
@@ -978,25 +1141,73 @@
     return Math.max(1, Math.round(base * v));
   }
 
+  // ท่าของศัตรูยกนี้: อ่านใจไว้แล้ว = ท่านั้น (ใช้แล้วหมด) · ไม่งั้นสุ่มตามนิสัย
+  function foeMove(s, b) {
+    if (b.peek && MOVES.indexOf(b.peek) !== -1) {
+      var m = b.peek;
+      b.peek = null;
+      return m;
+    }
+    return MOVES[pickWeighted(s, b.bias)];
+  }
+
+  // โล่ไม้: ถ้าพร้อมอยู่และยกนี้จะโดนตี = กันไว้ ไม่เจ็บ (ใช้แล้วหมด) · คืนแรงที่โดนจริง
+  function blockHit(b, took) {
+    if (took > 0 && b.block) {
+      b.block = 0;
+      return 0;
+    }
+    return took;
+  }
+
   function exchange(s, out, mine) {
     var b = s.battle;
     var p = s.players[s.turn];
-    var theirs = MOVES[pickWeighted(s, b.bias)];
+    var theirs = foeMove(s, b);
     var mult = TABLE[mine][theirs];
-    var dealt = damage(s, atkOf(p), b.def, mult[0]);
-    var took = damage(s, b.atk, defOf(p), mult[1]);
+    var dealt = damage(s, atkOf(p) + (b.oil || 0), b.def, mult[0]);
+    var raw = damage(s, b.atk, defOf(p), mult[1]);
+    var took = blockHit(b, raw);
     b.hp = Math.max(0, b.hp - dealt);
     p.hp = Math.max(0, p.hp - took);
     b.n += 1;
-    b.last = { me: mine, foe: theirs, dealt: dealt, took: took };
-    ev(out, 'hit', p.name + ' ' + MOVE_NAME[mine] + ' · ' + b.name + ' ' + MOVE_NAME[theirs] + ' — ทำได้ ' + dealt + ' · โดน ' + took, {
+    b.last = { me: mine, foe: theirs, dealt: dealt, took: took, blocked: raw > took ? raw : 0 };
+    ev(out, 'hit', p.name + ' ' + MOVE_NAME[mine] + ' · ' + b.name + ' ' + MOVE_NAME[theirs] + ' — ทำได้ ' + dealt + ' · โดน ' + took + (raw > took ? ' (โล่ไม้กันไว้ ' + raw + ')' : ''), {
       p: s.turn,
       me: mine,
       foe: theirs,
       dealt: dealt,
-      took: took
+      took: took,
+      blocked: raw > took ? raw : 0
     });
     afterExchange(s, out);
+  }
+
+  // ของช่วยรบระหว่างสู้ (ไม่เสียยก อีกฝ่ายไม่ได้สวน) · คืน true = ใช้ได้
+  function useFightItem(s, pi, id, out) {
+    var b = s.battle;
+    var p = s.players[pi];
+    if (!b || FIGHT_ITEMS.indexOf(id) === -1 || !(p[id] > 0)) return false;
+    if (id === 'oil') {
+      if (b.oil) return false; // ใช้ได้ครั้งเดียวต่อการต่อสู้
+      b.oil = OIL_ATK;
+      p.oil -= 1;
+      ev(out, 'fight-item', p.name + ' ทา' + ITEMS.oil.name + ' — โจมตี +' + OIL_ATK + ' จนจบการต่อสู้นี้', { p: pi, item: id });
+      return true;
+    }
+    if (id === 'buckler') {
+      if (b.block) return false; // ยกโล่ค้างไว้แล้ว
+      b.block = 1;
+      p.buckler -= 1;
+      ev(out, 'fight-item', p.name + ' ยก' + ITEMS.buckler.name + ' — กันการโดนตีครั้งถัดไป', { p: pi, item: id });
+      return true;
+    }
+    // คัมภีร์อ่านใจ: สุ่มท่าของอีกฝ่ายยกถัดไปไว้ก่อนเลย แล้วบอกให้รู้
+    if (b.peek) return false;
+    b.peek = MOVES[pickWeighted(s, b.bias)];
+    p.scroll -= 1;
+    ev(out, 'fight-item', p.name + ' เปิด' + ITEMS.scroll.name + ' — ' + b.name + ' จะ' + MOVE_NAME[b.peek] + 'ยกถัดไป', { p: pi, item: id, peek: b.peek });
+    return true;
   }
 
   function afterExchange(s, out) {
@@ -1087,7 +1298,8 @@
   function startDuel(s, out, target) {
     s.phase = 'duel';
     s.pending = null;
-    s.duel = { a: s.turn, b: target, plans: [null, null] };
+    // items[0|1] = ของช่วยรบที่แต่ละฝ่ายเลือกใช้ตอนวางแผน ('oil' | 'buckler') — หักจากกระเป๋าตอนเปิดผล
+    s.duel = { a: s.turn, b: target, plans: [null, null], items: [[], []] };
     ev(out, 'duel', s.players[s.turn].name + ' ท้าประลอง ' + s.players[target].name + '!', { p: s.turn, to: target });
   }
 
@@ -1107,15 +1319,41 @@
     var B = s.players[d.b];
     var dmg = [0, 0];
     var rounds = [];
+    // ของช่วยรบในการประลอง: น้ำมันดาบ = โจมตี +OIL_ATK ทั้ง 3 ยก · โล่ไม้ = ยกแรกที่จะโดนตี ไม่เจ็บ
+    var its = d.items || [[], []];
+    var used = [[], []];
+    var boost = [0, 0];
+    var shield = [0, 0];
+    [A, B].forEach(function (P, side) {
+      (its[side] || []).forEach(function (id) {
+        if (!(P[id] > 0) || used[side].indexOf(id) !== -1) return;
+        P[id] -= 1;
+        used[side].push(id);
+        if (id === 'oil') boost[side] = OIL_ATK;
+        if (id === 'buckler') shield[side] = 1;
+      });
+    });
     for (var k = 0; k < 3; k++) {
       var ma = d.plans[0][k];
       var mb = d.plans[1][k];
       var mult = TABLE[ma][mb];
-      var x = damage(s, atkOf(A), defOf(B), mult[0]);
-      var y = damage(s, atkOf(B), defOf(A), mult[1]);
+      var x = damage(s, atkOf(A) + boost[0], defOf(B), mult[0]);
+      var y = damage(s, atkOf(B) + boost[1], defOf(A), mult[1]);
+      var ra = '';
+      var rb = '';
+      if (x > 0 && shield[1]) {
+        shield[1] = 0;
+        rb = x; // B ยกโล่กันไว้
+        x = 0;
+      }
+      if (y > 0 && shield[0]) {
+        shield[0] = 0;
+        ra = y;
+        y = 0;
+      }
       dmg[0] += x;
       dmg[1] += y;
-      rounds.push({ a: ma, b: mb, da: x, db: y });
+      rounds.push({ a: ma, b: mb, da: x, db: y, ba: ra || 0, bb: rb || 0 });
     }
     var win = dmg[0] > dmg[1] ? d.a : dmg[1] > dmg[0] ? d.b : -1;
     var take = 0;
@@ -1126,14 +1364,25 @@
       s.players[win].gold += take;
       s.players[win].st.duelsWon += 1;
     }
-    d.result = { rounds: rounds, dmg: dmg, winner: win, take: take };
+    d.result = { rounds: rounds, dmg: dmg, winner: win, take: take, used: used };
+    var usedText = [A, B]
+      .map(function (P, side) {
+        return used[side].length
+          ? ' · ' + P.name + ' ใช้' + used[side]
+              .map(function (id) {
+                return ITEMS[id].name;
+              })
+              .join('+')
+          : '';
+      })
+      .join('');
     ev(
       out,
       'duel-result',
-      win < 0
+      (win < 0
         ? 'ประลองเสมอ ' + dmg[0] + ' ต่อ ' + dmg[1] + ' — ไม่มีใครเสียเงิน'
-        : s.players[win].name + ' ชนะประลอง (' + dmg[0] + ' ต่อ ' + dmg[1] + ') ได้เงิน ' + take + ' เหรียญ',
-      { p: d.a, to: d.b, winner: win, take: take, rounds: rounds, dmg: dmg }
+        : s.players[win].name + ' ชนะประลอง (' + dmg[0] + ' ต่อ ' + dmg[1] + ') ได้เงิน ' + take + ' เหรียญ') + usedText,
+      { p: d.a, to: d.b, winner: win, take: take, rounds: rounds, dmg: dmg, used: used }
     );
     // ประลองจบ → ผลของช่องที่ยืนอยู่ยังเกิดตามปกติ
     s.duel = null;
@@ -1147,7 +1396,8 @@
     var list = [];
     ITEM_IDS.forEach(function (id) {
       var I = ITEMS[id];
-      list.push({ id: id, group: 'item', name: I.name, price: I.price, note: I.note + ' · มี ' + p[id] + '/' + I.max, ok: p[id] < I.max });
+      var have = p[id] || 0;
+      list.push({ id: id, group: I.fight ? 'fight' : 'item', name: I.name, price: I.price, note: I.note + ' · มี ' + have + '/' + I.max, ok: have < I.max });
     });
     var nw = p.w + 1;
     if (nw < WEAPONS.length) list.push({ id: 'w', group: 'gear', name: WEAPONS[nw].name, price: WEAPONS[nw].price, note: 'อาวุธขั้น ' + (nw + 1) + ' · โจมตี +' + WEAPONS[nw].atk, ok: true });
@@ -1171,7 +1421,7 @@
     })[0];
     if (!it || !it.ok) return false;
     p.gold -= it.price;
-    if (ITEMS[id]) p[id] += 1;
+    if (ITEMS[id]) p[id] = (p[id] || 0) + 1;
     else if (id === 'w') p.w += 1;
     else if (id === 'ar') p.ar += 1;
     else if (id.indexOf('ch') === 0) p.ch = Number(id.slice(2));
@@ -1187,9 +1437,11 @@
    * { type: 'duel', target } | { type: 'skip' }  duel-offer
    * { type: 'fight' } | { type: 'skip' }         town (ยังไม่มีเจ้าของ)
    * { type: 'invest', town, levels }             invest (0 = ไม่ลงทุน · ≥1 = สู้หัวหน้าผู้เฝ้าเพื่อขยาย 1 ระดับ · town = ลำดับใน s.towns)
+   * { type: 'rest' } | { type: 'rob' }           visit (เมืองคนอื่น · ไม่มี skip)
    * { type: 'buy', item } | { type: 'leave' }    shop
    * { type: 'move', m: 'A'|'H'|'D' }             battle
-   * { type: 'plan', moves: [3 ท่า] }              duel (ของ decider)
+   * { type: 'use', item: 'oil'|'buckler'|'scroll' } battle (ของช่วยรบ ไม่เสียยก)
+   * { type: 'plan', moves: [3 ท่า], items: ['oil','buckler'] }  duel (ของ decider · items ไม่ใส่ก็ได้)
    * คืน events (array) · ทำไม่ได้ = คืน null
    */
   function act(s, a) {
@@ -1245,6 +1497,13 @@
           startBattle(s, out, upgradeFoe(s, a.town), a.town, t.level + 1);
           return out;
         }
+        if (k === 'visit') {
+          // ต้องเลือกอย่างใดอย่างหนึ่ง — ไม่มี 'skip' (ไม่มีทางผ่านฟรี)
+          if (a.type === 'rest') restAt(s, out);
+          else if (a.type === 'rob') robTown(s, out);
+          else return null;
+          return out;
+        }
         if (k === 'shop') {
           if (a.type === 'buy') return buy(s, out, a.item) ? out : null;
           if (a.type === 'leave') {
@@ -1263,16 +1522,25 @@
         }
         if (a.type === 'use' && a.item === 'potion') {
           if (!usePotion(s, pi, out)) return null;
-          // ดื่มยา = เสียจังหวะ อีกฝ่ายได้โจมตีฟรี (ท่าตามนิสัย ถ้าป้องกัน = ไม่ทำอะไร)
-          var mv = MOVES[pickWeighted(s, b.bias)];
-          var took = mv === 'D' ? 0 : damage(s, b.atk, defOf(p), mv === 'H' ? 1.5 : 1);
+          // ดื่มยา = เสียจังหวะ อีกฝ่ายได้โจมตีฟรี (ท่าตามนิสัย/ที่อ่านใจไว้ ถ้าป้องกัน = ไม่ทำอะไร · โล่ไม้กันได้)
+          var mv = foeMove(s, b);
+          var raw = mv === 'D' ? 0 : damage(s, b.atk, defOf(p), mv === 'H' ? 1.5 : 1);
+          var took = blockHit(b, raw);
           p.hp = Math.max(0, p.hp - took);
           b.n += 1;
-          b.last = { me: 'P', foe: mv, dealt: 0, took: took };
-          ev(out, 'hit', p.name + ' ดื่มยา · ' + b.name + (mv === 'D' ? ' ตั้งท่ารอ' : ' ฉวย' + MOVE_NAME[mv] + ' — โดน ' + took), { p: pi, me: 'P', foe: mv, dealt: 0, took: took });
+          b.last = { me: 'P', foe: mv, dealt: 0, took: took, blocked: raw > took ? raw : 0 };
+          ev(out, 'hit', p.name + ' ดื่มยา · ' + b.name + (mv === 'D' ? ' ตั้งท่ารอ' : ' ฉวย' + MOVE_NAME[mv] + ' — โดน ' + took + (raw > took ? ' (โล่ไม้กันไว้)' : '')), {
+            p: pi,
+            me: 'P',
+            foe: mv,
+            dealt: 0,
+            took: took,
+            blocked: raw > took ? raw : 0
+          });
           afterExchange(s, out);
           return out;
         }
+        if (a.type === 'use' && FIGHT_ITEMS.indexOf(a.item) !== -1) return useFightItem(s, pi, a.item, out) ? out : null;
         if (a.type === 'use' && a.item === 'bomb') {
           if (p.bomb <= 0) return null;
           p.bomb -= 1;
@@ -1294,7 +1562,16 @@
       case 'duel': {
         if (a.type !== 'plan' || !validPlan(a.moves)) return null;
         var d = s.duel;
-        d.plans[d.plans[0] ? 1 : 0] = a.moves.slice();
+        var side = d.plans[0] ? 1 : 0;
+        // ของช่วยรบที่ใช้ในการประลองได้: น้ำมันดาบ / โล่ไม้ (คัมภีร์อ่านใจใช้ไม่ได้ — แผนของคนเป็นความลับ)
+        var want = Array.isArray(a.items) ? a.items : [];
+        var planner = s.players[side ? d.b : d.a];
+        for (var wi = 0; wi < want.length; wi++) {
+          if ((want[wi] !== 'oil' && want[wi] !== 'buckler') || !(planner[want[wi]] > 0) || want.indexOf(want[wi]) !== wi) return null;
+        }
+        if (!d.items) d.items = [[], []];
+        d.items[side] = want.slice();
+        d.plans[side] = a.moves.slice();
         if (d.plans[1]) resolveDuel(s, out);
         else ev(out, 'planned', s.players[d.a].name + ' วางแผนเสร็จแล้ว', { p: d.a });
         return out;
@@ -1306,11 +1583,53 @@
   /* ---------- คอม ---------- */
   // ประมาณโอกาสชนะแบบหยาบ: เทียบจำนวนยกที่ต้องใช้ล้มอีกฝ่าย (นับระเบิดในกระเป๋าด้วย)
   function edge(p, foe) {
-    var mine = Math.max(1, atkOf(p) - foe.def * 0.5);
+    var mine = Math.max(1, atkOf(p) + (p.oil > 0 ? OIL_ATK * 0.8 : 0) - foe.def * 0.5);
     var theirs = Math.max(1, foe.atk - defOf(p) * 0.5);
-    var myLife = p.hp + p.potion * Math.ceil(p.mhp / 2) * 0.6;
+    var myLife = p.hp + p.potion * Math.ceil(p.mhp / 2) * 0.6 + (p.buckler > 0 ? theirs * 1.1 : 0);
     var foeHp = Math.max(1, foe.hp - (p.bomb || 0) * BOMB_DMG * 0.8);
     return myLife / theirs / (foeHp / mine);
+  }
+
+  /* คอมเลือก พักค้างคืน / ปล้นเมือง ด้วยค่าคาดหวัง (เงิน):
+   *   ปล้น = โอกาส × ที่ได้ (ไม่เกินเงินเจ้าเมือง) − (1 − โอกาส) × ค่าปรับ (ไม่เกินเงินตัวเอง) − โทษถ้าปล้นพลาดแล้วหมดตัวทั้งที่พักได้
+   *   พัก  = − ค่าพัก + มูลค่าพลังชีวิตที่ได้คืน (มีค่ามากถ้าเลือดน้อยและยังเหลือหลายรอบ · รอบท้าย ๆ แทบไม่มีค่า)
+   * นิสัย: meek กลัวเสี่ยง (ต้องได้เปรียบชัด) · bold/always/brute ชอบเสี่ยง · hoard คิดเงินล้วน */
+  var HP_GOLD = 1.6; // พลังชีวิต 1 หน่วย ≈ 1.6 เหรียญ (ยาฟื้นพลัง 30 เหรียญ ฟื้นราว 15–30)
+  function cpuVisit(s, di) {
+    var p = s.players[di];
+    var info = visitInfo(s, s.pending.town, di);
+    var o = s.players[info.owner];
+    var style = p.style;
+    var pw = info.chance;
+    var gain = Math.min(o.gold, info.win);
+    var loss = Math.min(p.gold, info.lose);
+    // ค่าปรับเกินเงินที่มี แต่ค่าพักยังจ่ายไหว = ปล้นพลาดแล้วหมดตัวทั้งที่ไม่จำเป็น → พักไว้ก่อน (ยกเว้นนิสัยชอบเสี่ยง)
+    // ค่าพักก็จ่ายไม่ไหวอยู่แล้ว = ยังไงก็หมดตัว ปล้นดีกว่า (มีโอกาสรอด)
+    var bold = style === 'bold' || style === 'always' || style === 'brute';
+    // กันเงินไว้: ปล้นพลาดแล้วต้องยังเหลือพอจ่ายค่าผ่านทางครั้งหน้าอีกสักครั้ง (นิสัยชอบเสี่ยงกันน้อยกว่า)
+    var cushion = bold ? 0 : Math.max(info.fee, 30);
+    if (info.lose + cushion > p.gold && info.fee <= p.gold) return { type: 'rest' };
+    var robEV = pw * gain - (1 - pw) * loss;
+    var left = Math.max(0, 1 - s.round / s.rounds);
+    var missing = p.mhp - p.hp;
+    var hpVal = style === 'hoard' ? 0 : missing * HP_GOLD * Math.min(1, left * 2.5) * (p.hp < p.mhp * 0.5 ? 1.3 : 1);
+    var restEV = -Math.min(p.gold, info.fee) + hpVal;
+    var margin = 0;
+    if (style === 'meek') margin = info.fee * 0.8 + 10; // ต้องคุ้มกว่าพักชัด ๆ ถึงยอมเสี่ยง
+    else if (style === 'bold' || style === 'always' || style === 'brute') margin = -info.fee * 0.4;
+    return robEV > restEV + margin ? { type: 'rob' } : { type: 'rest' };
+  }
+
+  // คอมใช้ของช่วยรบระหว่างสู้ (คืน null = ไม่ใช้)
+  function cpuFightItem(p, b, style) {
+    var tough = b.town >= 0 || b.hp >= 30;
+    // โล่ไม้: โดนตีแรงครั้งเดียวอาจล้ม
+    if (p.buckler > 0 && !b.block && p.hp <= b.atk * 1.7 && b.hp > BOMB_DMG) return 'buckler';
+    // น้ำมันดาบ: ศัตรูอึด ทาตั้งแต่ต้น
+    if (p.oil > 0 && !b.oil && (tough || style === 'brute') && b.hp > b.mhp * 0.5) return 'oil';
+    // คัมภีร์: ศัตรูแกร่ง (ผู้เฝ้า/หัวหน้า) หรือเลือดเราน้อย และศัตรูไม่ได้เดาใจยาก... ใช้ได้ทุกแบบ
+    if (p.scroll > 0 && !b.peek && style !== 'brute' && (b.town >= 0 || p.hp <= p.mhp * 0.5) && b.hp > BOMB_DMG) return 'scroll';
+    return null;
   }
 
   function reserve(s, pi) {
@@ -1419,6 +1738,7 @@
           if (bestT < 0) return { type: 'invest', levels: 0 };
           return { type: 'invest', town: bestT, levels: 1 };
         }
+        if (k === 'visit') return cpuVisit(s, di);
         if (k === 'shop') return cpuShop(s, di);
         return null;
       }
@@ -1430,6 +1750,9 @@
           if (p.bomb > 0 && b.hp <= BOMB_DMG * 2) return { type: 'use', item: 'bomb' };
           if (p.smoke > 0 && b.hp > b.mhp * 0.4) return { type: 'use', item: 'smoke' };
         }
+        var fi = cpuFightItem(p, b, style);
+        if (fi) return { type: 'use', item: fi };
+        if (b.peek) return { type: 'move', m: BEATS[b.peek] }; // รู้ท่าแล้ว = ออกท่าที่ชนะ
         if (style === 'brute') return { type: 'move', m: 'H' };
         if (rnd(s) < 0.6) return { type: 'move', m: counterOf(b.bias) };
         return { type: 'move', m: MOVES[rint(s, 0, 2)] };
@@ -1437,7 +1760,14 @@
       case 'duel': {
         var plan = [];
         for (var j = 0; j < 3; j++) plan.push(style === 'brute' ? 'H' : MOVES[rint(s, 0, 2)]);
-        return { type: 'plan', moves: plan };
+        // ของช่วยรบ: ใช้เมื่อเดิมพันคุ้ม (อีกฝ่าย/ตัวเองมีเงินมาก)
+        var dd = s.duel;
+        var foeP = s.players[di === dd.a ? dd.b : dd.a];
+        var stake = Math.max(foeP.gold, p.gold) * DUEL_TAKE;
+        var its = [];
+        if (p.oil > 0 && stake >= 40) its.push('oil');
+        if (p.buckler > 0 && stake >= 60) its.push('buckler');
+        return its.length ? { type: 'plan', moves: plan, items: its } : { type: 'plan', moves: plan };
       }
     }
     return null;
@@ -1480,6 +1810,12 @@
       }
     }
     if (p.bomb < 1 && (a = buyIf('bomb', keep + 20))) return a;
+    // ของช่วยรบ (v9): แต่ละนิสัยชอบคนละชิ้น · ช่วงท้ายเกมไม่ซื้อ (สู้น้อยลงแล้ว)
+    if (frac < 0.8) {
+      var fav = style === 'brute' || style === 'bold' ? 'oil' : style === 'meek' ? 'buckler' : 'scroll';
+      if (!(p[fav] > 0) && (a = buyIf(fav, keep + 30))) return a;
+      if (p.buckler < 1 && (a = buyIf('buckler', keep + 70))) return a;
+    }
     if (p.ward < 1 && (a = buyIf('ward', keep + 40))) return a;
     if (p.boots < 1 && (a = buyIf('boots', keep + 60))) return a;
     return { type: 'leave' };
@@ -1518,6 +1854,14 @@
     CHARMS: CHARMS,
     ITEMS: ITEMS,
     ITEM_IDS: ITEM_IDS,
+    FIGHT_ITEMS: FIGHT_ITEMS,
+    OIL_ATK: OIL_ATK,
+    ROB_WIN: ROB_WIN,
+    ROB_LOSE: ROB_LOSE,
+    ROB_BONUS: ROB_BONUS,
+    robBonus: robBonus,
+    robChance: robChance,
+    visitInfo: visitInfo,
     CARDS: CARDS,
     CARD_CAP: CARD_CAP,
     CHEST_W: CHEST_W,

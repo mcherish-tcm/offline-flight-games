@@ -45,6 +45,7 @@
   var anim = null; // { p, pos } ตำแหน่งตัวหมากระหว่างเดิน
   var view = null; // หน้าสรุปที่รอผู้เล่นแตะ "ไปต่อ" { kind: 'battle'|'duel', ... }
   var plan = []; // ท่าที่กำลังวางแผนประลอง
+  var planItems = []; // ของช่วยรบที่เลือกใช้ในการประลอง ('oil' | 'buckler')
   var hideResult = false;
   var coverAt = 0;
 
@@ -179,6 +180,7 @@
     anim = null;
     view = null;
     plan = [];
+    planItems = [];
     hideResult = false;
     opts.mode = mode;
     opts.length = length;
@@ -365,6 +367,19 @@
         }
         FG.toast(e.t, 2400);
         return 900;
+      case 'rob':
+        // ผลปล้นเมือง: คนเกี่ยวข้อง (คนปล้นหรือเจ้าเมือง) เห็นเต๋าทั้งสองลูกแล้วแตะไปต่อ · คอมกับคอม = แถบแจ้ง
+        addLog(e.t);
+        if (isHuman(e.p) || isHuman(e.to)) {
+          view = { kind: 'rob', e: e };
+          FG.buzz(e.ok ? [30, 40, 60] : 25);
+          return -1;
+        }
+        FG.toast(e.t, 2400);
+        return 900;
+      case 'fight-item':
+        addLog('  ' + e.t);
+        return cpuSide ? 500 : 0;
       case 'win':
       case 'lose':
       case 'draw':
@@ -420,7 +435,7 @@
       var a = R.cpuAct(S.s);
       if (!a || !run(a)) {
         // ไม่ควรเกิด — กันเกมค้าง
-        run({ type: 'leave' }) || run({ type: 'skip' }) || run({ type: 'roll' });
+        run({ type: 'leave' }) || run({ type: 'skip' }) || run({ type: 'rest' }) || run({ type: 'roll' });
       }
     }, wait);
   }
@@ -434,7 +449,11 @@
     var evs = R.act(S.s, action);
     if (!evs) {
       lastBattle = null;
+      var b0 = S.s.battle;
       if (action.item === 'potion') FG.toast('ใช้ยาไม่ได้ — ไม่มียา หรือพลังชีวิตเต็มอยู่แล้ว', 1800);
+      else if (action.item === 'oil' && b0 && b0.oil) FG.toast('ทาน้ำมันดาบไปแล้วในการต่อสู้นี้', 1600);
+      else if (action.item === 'buckler' && b0 && b0.block) FG.toast('ยกโล่ไม้ไว้แล้ว — รอกันการโดนตีครั้งถัดไป', 1600);
+      else if (action.item === 'scroll' && b0 && b0.peek) FG.toast('อ่านใจไว้แล้ว — เลือกท่าได้เลย', 1600);
       else if (action.item) FG.toast('ใช้ไม่ได้ — ไม่มีของชิ้นนี้', 1600);
       return;
     }
@@ -623,6 +642,10 @@
         }, true));
         return;
       }
+      if (k === 'visit') {
+        msgEl.textContent = 'แวะ' + townName(s.pending.town) + ' เมืองของ ' + P(s.towns[s.pending.town].owner).name + ' — เลือก พักค้างคืน หรือ ปล้นเมือง';
+        return;
+      }
       msgEl.textContent = k === 'shop' ? 'แวะร้านพ่อค้าเร่' : 'ขยายเมือง (ต้องสู้ชนะก่อน)';
       return;
     }
@@ -652,6 +675,7 @@
     if (view && view.kind === 'battle') return battleView(view.b, view.e);
     if (view && view.kind === 'duel') return duelResult(view.e);
     if (view && view.kind === 'card') return cardView(view.e);
+    if (view && view.kind === 'rob') return robResult(view.e);
     var d = R.decider(s);
     if (s.phase === 'over') {
       if (busy || hideResult) {
@@ -668,7 +692,68 @@
     if (s.phase === 'duel') return duelPlan();
     if (s.phase === 'decide' && s.pending.kind === 'shop') return shop();
     if (s.phase === 'decide' && s.pending.kind === 'invest') return invest();
+    if (s.phase === 'decide' && s.pending.kind === 'visit') return visit();
     ovEl.hidden = true;
+  }
+
+  /* ---------- แวะเมืองคนอื่น: พักค้างคืน / ปล้นเมือง (v9) ---------- */
+  function visit() {
+    var s = S.s;
+    var pi = s.turn;
+    var p = P(pi);
+    var k = s.pending.town;
+    var t = s.towns[k];
+    var o = P(t.owner);
+    var info = R.visitInfo(s, k, pi);
+    var win = Math.min(info.win, o.gold);
+    var chance = Math.round(info.chance * 100);
+    var extra = [];
+    if (s.fest > 0) extra.push('เทศกาล ×' + R.FEST_MULT);
+    if (R.hasCharm(p, 'seal')) extra.push('ตราผ่านแดน จ่ายครึ่งเดียว');
+    var html =
+      '<p class="rl-ov__kicker">' + dot(t.owner) + 'เมืองของ ' + esc(o.name) + ' · ระดับ ' + t.level + '</p>' +
+      '<h2 class="rl-ov__title">' + svg('town', 'rl-title-ico') + esc(townName(k)) + '</h2>' +
+      '<p class="rl-note">' + esc(p.name) + ' มี <b class="num">' + FG.fmtNum(p.gold) + '</b> เหรียญ · พลังชีวิต ' + p.hp + '/' + p.mhp +
+      (extra.length ? ' · ' + esc(extra.join(' · ')) : '') + '<br>เลือกอย่างใดอย่างหนึ่ง (ผ่านไปเฉย ๆ ไม่ได้)</p>' +
+      '<div class="rl-visit">' +
+      '<button type="button" class="rl-choice is-rest" data-v="rest">' +
+      '<span class="rl-choice__head">' + svg('rest', 'rl-choice__ico') + '<b>พักค้างคืน</b></span>' +
+      '<span class="rl-choice__main num">จ่าย ' + FG.fmtNum(info.fee) + ' เหรียญ</span>' +
+      '<span class="rl-choice__sub">พลังชีวิตเต็ม' + (p.hp < p.mhp ? ' (' + p.hp + ' → ' + p.mhp + ')' : '') + '</span>' +
+      (p.gold < info.fee ? '<span class="rl-choice__sub rl-warn">เงินไม่พอ — จ่ายได้แค่ ' + FG.fmtNum(p.gold) + ' (หมดตัว)</span>' : '') +
+      '</button>' +
+      '<button type="button" class="rl-choice is-rob" data-v="rob">' +
+      '<span class="rl-choice__head">' + svg('swords', 'rl-choice__ico') + '<b>ปล้นเมือง</b></span>' +
+      '<span class="rl-choice__main num">ชนะ +' + FG.fmtNum(win) + ' · แพ้ −' + FG.fmtNum(info.lose) + '</span>' +
+      '<span class="rl-choice__sub">ทอยเต๋าสูงกว่า' + esc(o.name) + (info.bonus ? ' (เจ้าเมือง +' + info.bonus + ')' : '') + ' · เสมอ = แพ้ · โอกาส ' + chance + '%</span>' +
+      (win < info.win ? '<span class="rl-choice__sub">เจ้าเมืองมีเงินแค่ ' + FG.fmtNum(o.gold) + ' (ปกติได้ ×' + R.ROB_WIN + ' = ' + FG.fmtNum(info.win) + ')</span>' : '') +
+      (p.gold < info.lose ? '<span class="rl-choice__sub rl-warn">แพ้ = เสียได้แค่ ' + FG.fmtNum(p.gold) + ' (หมดตัว)</span>' : '') +
+      '</button>' +
+      '</div>';
+    showOv(html, 'visit');
+    ovBox.querySelectorAll('[data-v]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        act({ type: el.getAttribute('data-v') });
+      });
+    });
+  }
+
+  // ผลปล้นเมือง: เต๋าคนปล้น vs เต๋าเจ้าเมือง (+ แต้มบวก) · มุมมองของคน (คนปล้นก่อน ถ้าเป็นคอม = มุมเจ้าเมือง)
+  function robResult(e) {
+    var mine = isHuman(e.p) ? e.ok : !e.ok;
+    var html =
+      '<p class="rl-ov__kicker">ปล้นเมือง · ' + esc(townName(e.town)) + '</p>' +
+      '<div class="rl-rob">' +
+      '<div class="rl-rob__side"><span class="rl-rob__who">' + dot(e.p) + esc(P(e.p).name) + '</span>' +
+      '<span class="rl-die rl-rob__die is-roll num">' + e.a + '</span><span class="rl-rob__sum num">คนปล้น ' + e.a + '</span></div>' +
+      '<span class="rl-rob__vs">ต่อ</span>' +
+      '<div class="rl-rob__side"><span class="rl-rob__who">' + dot(e.to) + esc(P(e.to).name) + '</span>' +
+      '<span class="rl-die rl-rob__die is-roll num">' + e.b + '</span><span class="rl-rob__sum num">เจ้าเมือง ' + e.b + (e.bonus ? ' + ' + e.bonus + ' = ' + (e.b + e.bonus) : '') + '</span></div>' +
+      '</div>' +
+      '<p class="rl-result ' + (mine ? 'is-win' : 'is-lose') + '">' + esc(e.t) + '</p>' +
+      '<div class="rl-ov__actions"><button type="button" class="btn btn--primary" data-go="1">ไปต่อ</button></div>';
+    showOv(html, 'rob');
+    ovBox.querySelector('[data-go]').addEventListener('click', closeView);
   }
 
   function hpBar(cur, max, cls) {
@@ -690,7 +775,13 @@
           last.me === 'P'
             ? esc(p.name) + ' ดื่มยา · ' + esc(b.name) + (last.foe === 'D' ? ' ตั้งท่ารอ' : ' ฉวย' + R.MOVE_NAME[last.foe] + ' โดน ' + last.took)
             : esc(p.name) + ' <b>' + R.MOVE_NAME[last.me] + '</b> · ' + esc(b.name) + '<b>' + R.MOVE_NAME[last.foe] + '</b><br>ทำได้ ' + last.dealt + ' · โดน ' + last.took;
+      if (last.blocked) lastHtml += ' · <b>โล่ไม้กันไว้ ' + last.blocked + '</b>';
     }
+    // ผลของช่วยรบที่ยังทำงานอยู่ในการต่อสู้นี้
+    var fx = [];
+    if (b.oil) fx.push('น้ำมันดาบ: โจมตี +' + b.oil);
+    if (b.block) fx.push('โล่ไม้: กันการโดนตีครั้งถัดไป');
+    if (b.peek && !endEv) fx.push('อ่านใจ: ' + b.name + 'จะ<b>' + R.MOVE_NAME[b.peek] + '</b> → ออก<b>' + R.MOVE_NAME[R.BEATS[b.peek]] + '</b>ชนะ');
     var where = b.town < 0 ? 'ป่ามอนสเตอร์' : b.up ? 'ขยาย' + esc(townName(b.town)) + ' → ระดับ ' + b.up : 'ผู้เฝ้า' + esc(townName(b.town));
     var html =
       '<p class="rl-ov__kicker">' + where + ' · ยกที่ ' + Math.max(1, Math.min(b.n + (endEv ? 0 : 1), R.MAX_EXCHANGES)) + '/' + R.MAX_EXCHANGES + '</p>' +
@@ -699,25 +790,34 @@
       '<span class="rl-fighter__stat num">' + b.hp + '/' + b.mhp + ' · โจมตี ' + b.atk + ' · ป้องกัน ' + b.def + '</span>' +
       '<span class="rl-habit">นิสัย: ' + habit(b.bias) + '</span></div>' +
       '<div class="rl-fighter"><span class="rl-fighter__name">' + dot(pi) + esc(p.name) + ' Lv ' + p.lv + '</span>' + hpBar(p.hp, p.mhp) +
-      '<span class="rl-fighter__stat num">' + p.hp + '/' + p.mhp + ' · โจมตี ' + R.atkOf(p) + ' · ป้องกัน ' + R.defOf(p) + '</span></div>' +
+      '<span class="rl-fighter__stat num">' + p.hp + '/' + p.mhp + ' · โจมตี ' + (R.atkOf(p) + (b.oil || 0)) + ' · ป้องกัน ' + R.defOf(p) + '</span></div>' +
       '</div>' +
-      '<p class="rl-last">' + (lastHtml || 'เลือกท่า — อีกฝ่ายเลือกพร้อมกัน') + '</p>';
+      '<p class="rl-last">' + (lastHtml || 'เลือกท่า — อีกฝ่ายเลือกพร้อมกัน') + '</p>' +
+      (fx.length ? '<p class="rl-fx">' + fx.join(' · ') + '</p>' : '');
     if (endEv) {
       html += '<p class="rl-result is-' + endEv.k + '">' + esc(endEv.t) + '</p><div class="rl-ov__actions"><button type="button" class="btn btn--primary" data-go="1">ไปต่อ</button></div>';
       showOv(html, 'battle');
       ovBox.querySelector('[data-go]').addEventListener('click', closeView);
       return;
     }
+    var hint = b.peek ? R.BEATS[b.peek] : '';
+    function itemBtn(id, label, ok) {
+      var n = P(pi)[id] || 0;
+      return '<button type="button" class="btn rl-item" data-item="' + id + '"' + (ok ? '' : ' disabled') + '><b>' + label + '</b><small class="num">×' + n + '</small></button>';
+    }
     html +=
       '<div class="rl-moves">' +
       R.MOVES.map(function (m) {
-        return '<button type="button" class="rl-move m-' + m + '" data-m="' + m + '"><b>' + R.MOVE_NAME[m] + '</b><span>' + MOVE_HINT[m] + '</span></button>';
+        return '<button type="button" class="rl-move m-' + m + (m === hint ? ' is-hint' : '') + '" data-m="' + m + '"><b>' + R.MOVE_NAME[m] + '</b><span>' + MOVE_HINT[m] + '</span></button>';
       }).join('') +
       '</div>' +
-      '<div class="rl-ov__actions rl-items">' +
-      '<button type="button" class="btn" data-item="potion"' + (p.potion > 0 && p.hp < p.mhp ? '' : ' disabled') + '>ยา ×' + p.potion + '</button>' +
-      '<button type="button" class="btn" data-item="bomb"' + (p.bomb > 0 ? '' : ' disabled') + '>ระเบิด ×' + p.bomb + '</button>' +
-      '<button type="button" class="btn" data-item="smoke"' + (p.smoke > 0 ? '' : ' disabled') + '>ลูกควัน ×' + p.smoke + '</button>' +
+      '<div class="rl-items">' +
+      itemBtn('potion', 'ยา', p.potion > 0 && p.hp < p.mhp) +
+      itemBtn('bomb', 'ระเบิด', p.bomb > 0) +
+      itemBtn('smoke', 'ลูกควัน', p.smoke > 0) +
+      itemBtn('oil', R.ITEMS.oil.short, p.oil > 0 && !b.oil) +
+      itemBtn('buckler', R.ITEMS.buckler.short, p.buckler > 0 && !b.block) +
+      itemBtn('scroll', R.ITEMS.scroll.short, p.scroll > 0 && !b.peek) +
       '</div>';
     showOv(html, 'battle');
     ovBox.querySelectorAll('[data-m]').forEach(function (el) {
@@ -759,8 +859,18 @@
         return '<button type="button" class="rl-move m-' + m + '" data-m="' + m + '"' + (plan.length >= 3 ? ' disabled' : '') + '><b>' + R.MOVE_NAME[m] + '</b><span>' + MOVE_HINT[m] + '</span></button>';
       }).join('') +
       '</div>' +
+      duelItemsHtml(P(me)) +
       '<div class="rl-ov__actions"><button type="button" class="btn" data-clear="1">ล้าง</button><button type="button" class="btn btn--primary" data-ok="1"' + (plan.length === 3 ? '' : ' disabled') + '>ยืนยันแผน</button></div>';
     showOv(html, 'duel');
+    ovBox.querySelectorAll('[data-pi]').forEach(function (el) {
+      el.addEventListener('click', function () {
+        var id = el.getAttribute('data-pi');
+        var at = planItems.indexOf(id);
+        if (at === -1) planItems.push(id);
+        else planItems.splice(at, 1);
+        renderOverlay();
+      });
+    });
     ovBox.querySelectorAll('[data-m]').forEach(function (el) {
       el.addEventListener('click', function () {
         if (plan.length < 3) plan.push(el.getAttribute('data-m'));
@@ -781,16 +891,42 @@
     ovBox.querySelector('[data-ok]').addEventListener('click', function () {
       if (plan.length !== 3) return;
       var moves = plan.slice();
+      var items = planItems.filter(function (id) {
+        return P(me)[id] > 0;
+      });
       plan = [];
-      act({ type: 'plan', moves: moves });
+      planItems = [];
+      act(items.length ? { type: 'plan', moves: moves, items: items } : { type: 'plan', moves: moves });
     });
+  }
+
+  // ของช่วยรบในการประลอง (น้ำมันดาบ / โล่ไม้) — แตะเพื่อเลือกใช้ · หักของตอนเปิดผล
+  function duelItemsHtml(p) {
+    var ids = ['oil', 'buckler'].filter(function (id) {
+      return p[id] > 0;
+    });
+    if (!ids.length) return '';
+    return (
+      '<p class="rl-group">ของช่วยรบ (แตะเพื่อใช้ในการประลองนี้)</p><div class="rl-items rl-items--duel">' +
+      ids
+        .map(function (id) {
+          var on = planItems.indexOf(id) !== -1;
+          return (
+            '<button type="button" class="btn rl-item' + (on ? ' is-on' : '') + '" data-pi="' + id + '" aria-pressed="' + on + '"><b>' + (on ? '✓ ' : '') + R.ITEMS[id].short + '</b><small>' +
+            (id === 'oil' ? 'โจมตี +' + R.OIL_ATK + ' ทั้ง 3 ยก' : 'กันการโดนตี 1 ยก') + ' · มี ' + p[id] + '</small></button>'
+          );
+        })
+        .join('') +
+      '</div>'
+    );
   }
 
   function duelResult(e) {
     var rows = e.rounds
       .map(function (r, k) {
+        // bb = แรงของฝั่ง A ที่โล่ไม้ของฝั่ง B กันไว้ (และกลับกัน)
         return (
-          '<tr><th>ยก ' + (k + 1) + '</th><td>' + R.MOVE_NAME[r.a] + ' <span class="num">' + r.da + '</span></td><td>' + R.MOVE_NAME[r.b] + ' <span class="num">' + r.db + '</span></td></tr>'
+          '<tr><th>ยก ' + (k + 1) + '</th><td>' + R.MOVE_NAME[r.a] + ' <span class="num">' + r.da + '</span>' + (r.bb ? ' <small>(ติดโล่ ' + r.bb + ')</small>' : '') + '</td><td>' + R.MOVE_NAME[r.b] + ' <span class="num">' + r.db + '</span>' + (r.ba ? ' <small>(ติดโล่ ' + r.ba + ')</small>' : '') + '</td></tr>'
         );
       })
       .join('');
@@ -826,13 +962,14 @@
 
   function bagText(p) {
     return R.ITEM_IDS.map(function (id) {
-      return R.ITEMS[id].name + ' ' + p[id];
+      return R.ITEMS[id].name + ' ' + (p[id] || 0);
     }).join(' · ');
   }
 
   var SHOP_GROUPS = [
     { id: 'item', label: 'ของใช้ (ใช้แล้วหมด)' },
-    { id: 'gear', label: 'อาวุธ · เกราะ (อัปเกรดทีละขั้น)' },
+    { id: 'fight', label: 'ของช่วยรบ (ใช้ระหว่างสู้ ไม่เสียยก · ใช้แล้วหมด)' },
+    { id: 'gear', label: 'อาวุธ · เกราะ (อัปเกรดทีละขั้น · 6 ขั้น)' },
     { id: 'charm', label: 'เครื่องราง (ใส่ได้ชิ้นเดียว)' }
   ];
 
@@ -916,7 +1053,12 @@
       .join('');
     var facts = s.players
       .map(function (p, i) {
-        return dot(i) + esc(p.name) + ': Lv ' + p.lv + ' · ชนะมอนสเตอร์ ' + p.st.wins + ' · แพ้ ' + p.st.losses + ' · ยึดเมือง ' + p.st.captured + ' · ขยายเมือง ' + (p.st.upWin || 0) + '/' + (p.st.upTry || 0) + ' · ได้ค่าผ่านทาง ' + p.st.tollGot;
+        var st = p.st;
+        var fromVisits = (st.tollGot || 0) + (st.defGot || 0) - (st.defLost || 0);
+        return (
+          dot(i) + esc(p.name) + ': Lv ' + p.lv + ' · ชนะมอนสเตอร์ ' + st.wins + ' · แพ้ ' + st.losses + ' · ยึดเมือง ' + st.captured + ' · ขยายเมือง ' + (st.upWin || 0) + '/' + (st.upTry || 0) +
+          ' · เมืองได้จากคนแวะสุทธิ ' + fromVisits + ' · ปล้นสำเร็จ ' + (st.robWin || 0) + '/' + (st.robTry || 0) + ' ครั้ง'
+        );
       })
       .join('<br>');
     var html =
@@ -975,9 +1117,9 @@
     var DESC = {
       start: 'ผ่าน = รับเงินหลวง ' + R.SALARY + ' + 10 ต่อเมืองที่มี (คนทรัพย์น้อยสุดได้เพิ่ม) แล้วขยายเมืองได้ 1 เมือง (ต้องสู้ชนะก่อน) · หยุดพอดี = โบนัสเพิ่ม',
       monster: 'เจอมอนสเตอร์สุ่ม ยิ่งท้ายเกมยิ่งเก่ง · ชนะได้เงิน + ค่าประสบการณ์',
-      chest: 'ครึ่งหนึ่งได้เงิน 20–60 (ท้ายเกมได้มากขึ้น) · อีกครึ่งได้ของ: ยา · ลูกควัน · ระเบิด · รองเท้า · ยันต์ · ยาเสริมแรง · ผลโอ๊กเพิ่มพลังชีวิต',
+      chest: 'ครึ่งหนึ่งได้เงิน 20–60 (ท้ายเกมได้มากขึ้น) · อีกครึ่งได้ของ: ยา · ลูกควัน · ระเบิด · รองเท้า · ยันต์ · น้ำมันดาบ · โล่ไม้ · คัมภีร์อ่านใจ · ยาเสริมแรง · ผลโอ๊กเพิ่มพลังชีวิต',
       card: 'เปิดไพ่เหตุการณ์ 1 ใบ (ไพ่ดี 10 · ไพ่ร้าย 6 ในกอง 16 ใบ) · ไพ่ร้ายเสียไม่เกิน 60 · ยันต์กันเคราะห์กันไพ่ร้ายได้',
-      shop: 'ซื้อของใช้ อาวุธ เกราะ (4 ขั้น) และเครื่องราง',
+      shop: 'ซื้อของใช้ ของช่วยรบ อาวุธ เกราะ (6 ขั้น) และเครื่องราง',
       rest: 'พลังชีวิตกลับมาเต็ม'
     };
     if (sp.t === 'town') {
@@ -988,7 +1130,10 @@
         var m = R.guardFoe(s, sp.town, 1);
         text = 'ยังไม่มีเจ้าของ · ผู้เฝ้า: ' + m.name + ' (พลังชีวิต ' + m.hp + ' · ' + habit(m.bias) + ') · ชนะแล้วจ่ายค่าฟื้นฟู ' + R.claimFee(t.i) + ' · มูลค่า ' + T.base;
       } else {
-        text = 'ของ ' + P(t.owner).name + ' · ระดับ ' + t.level + '/' + R.MAX_TOWN_LEVEL + ' · มูลค่า ' + R.townValue(t) + ' · ค่าผ่านทาง ' + R.toll(t) + (s.fest > 0 ? ' (ช่วงเทศกาล ×' + R.FEST_MULT + ')' : '');
+        var bonus = R.robBonus(t);
+        text =
+          'ของ ' + P(t.owner).name + ' · ระดับ ' + t.level + '/' + R.MAX_TOWN_LEVEL + ' · มูลค่า ' + R.townValue(t) + ' · ค่าผ่านทาง ' + R.toll(t) + (s.fest > 0 ? ' (ช่วงเทศกาล ×' + R.FEST_MULT + ')' : '') +
+          ' · คนอื่นตกเมืองนี้: พักค้างคืน (จ่ายค่าผ่านทาง) หรือปล้น (ชนะได้ ×' + R.ROB_WIN + ' · แพ้เสีย ×' + R.ROB_LOSE + ' · เจ้าเมือง' + (bonus ? ' +' + bonus : 'ไม่มีแต้มบวก') + ' · โอกาสปล้นสำเร็จ ' + Math.round(R.robChance(t) * 100) + '%)';
         if (t.level < R.MAX_TOWN_LEVEL) {
           var up = R.upgradeFoe(s, sp.town);
           text += ' · ขยายต่อ: สู้' + up.name + ' (พลังชีวิต ' + up.hp + ') แล้วจ่าย ' + R.investCost(t);

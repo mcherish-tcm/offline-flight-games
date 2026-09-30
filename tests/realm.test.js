@@ -338,6 +338,95 @@ test('เซฟรุ่น 1 ค้างกลางการต่อสู�
   assert.strictEqual(s.towns[2].owner, 0);
 });
 
+// เซฟรุ่น 2 (ก่อน v9): ไม่มีของช่วยรบ ไม่มีสถิติปล้น · ประลองไม่มี items · การต่อสู้ไม่มี oil/block/peek
+function v2Save(seed, map) {
+  var s = game(3, seed || 21, 'short', map || 'classic');
+  s.v = 2;
+  s.players.forEach(function (p) {
+    delete p.oil;
+    delete p.buckler;
+    delete p.scroll;
+    ['robTry', 'robWin', 'robGot', 'robLost', 'defGot', 'defLost'].forEach(function (k) {
+      delete p.st[k];
+    });
+  });
+  return s;
+}
+
+test('เซฟรุ่น 2 (ก่อน v9) โหลดได้: เติมค่าเริ่มต้นของใหม่ครบ แล้วเล่นต่อจนจบ (ทั้ง 2 แผนที่)', function () {
+  R.MAP_IDS.forEach(function (map) {
+    for (var k = 0; k < 20; k++) {
+      var s = v2Save(300 + k, map);
+      // เล่นไปครึ่งทางด้วยรุ่นปัจจุบันก่อน แล้วลบฟิลด์ใหม่ทิ้ง = จำลองเซฟเก่ากลางเกม
+      for (var i = 0; i < 40 + k * 3 && s.phase !== 'over'; i++) R.act(s, R.cpuAct(s));
+      s.v = 2;
+      s.players.forEach(function (p) {
+        delete p.oil;
+        delete p.buckler;
+        delete p.scroll;
+        delete p.st.robTry;
+        delete p.st.defLost;
+      });
+      if (s.battle) {
+        delete s.battle.oil;
+        delete s.battle.block;
+        delete s.battle.peek;
+      }
+      if (s.duel) delete s.duel.items;
+      var m = R.migrate(clone(s));
+      assert.ok(m, 'ต้องโหลดได้');
+      assert.strictEqual(m.v, R.VERSION);
+      m.players.forEach(function (p) {
+        R.FIGHT_ITEMS.forEach(function (id) {
+          assert.strictEqual(typeof p[id], 'number', id);
+        });
+        assert.strictEqual(p.st.robTry, 0);
+        assert.strictEqual(p.st.defLost, 0);
+      });
+      R.autoplay(m);
+      assert.strictEqual(m.phase, 'over');
+    }
+  });
+});
+
+test('เซฟรุ่น 2 ค้างกลางการต่อสู้ / กลางประลอง (ไม่มีช่องใหม่) → เล่นต่อได้ ใช้ของช่วยรบได้', function () {
+  var s = v2Save(31);
+  moveTo(s, 0, 3);
+  assert.strictEqual(s.phase, 'battle');
+  delete s.battle.oil;
+  delete s.battle.block;
+  delete s.battle.peek;
+  var m = R.migrate(clone(s));
+  assert.ok(m);
+  m.players[0].oil = 1;
+  assert.ok(R.act(m, { type: 'use', item: 'oil' }));
+  assert.ok(R.act(m, { type: 'move', m: 'A' }));
+  // กลางประลอง: ผู้ท้าวางแผนไปแล้ว
+  var d = v2Save(32);
+  d.players[1].pos = 5;
+  R.act(d, { type: 'roll', forced: 5 });
+  R.act(d, { type: 'duel', target: 1 });
+  R.act(d, { type: 'plan', moves: ['A', 'H', 'D'] });
+  delete d.duel.items;
+  var md = R.migrate(clone(d));
+  assert.ok(md);
+  var evs = R.act(md, { type: 'plan', moves: ['D', 'D', 'D'] });
+  assert.ok(kinds(evs).indexOf('duel-result') !== -1);
+  R.autoplay(md);
+  assert.strictEqual(md.phase, 'over');
+});
+
+test('เซฟรุ่น 1 ผ่านรุ่น 2 มาถึงรุ่นปัจจุบันในครั้งเดียว (มีของช่วยรบ = 0)', function () {
+  var m = R.migrate(v1Save(7));
+  assert.ok(m);
+  assert.strictEqual(m.v, R.VERSION);
+  m.players.forEach(function (p) {
+    assert.strictEqual(p.oil, 0);
+    assert.strictEqual(p.scroll, 0);
+    assert.strictEqual(p.st.robWin, 0);
+  });
+});
+
 test('ช่องชนิดเก่า "gold" ในกระดาน = ทำงานเหมือนหีบสมบัติ', function () {
   var s = game(2, 11);
   s.board[1] = { t: 'gold' };
@@ -455,26 +544,200 @@ test('ขยายเมือง: เงินไม่พอค่าลงท
 
 /* ---------- เมือง / ค่าผ่านทาง ---------- */
 
-test('ตกเมืองคนอื่น = จ่ายค่าผ่านทางให้เจ้าของ (เงินรวมไม่หาย)', function () {
+test('ตกเมืองคนอื่น = ต้องเลือก พัก/ปล้น (ไม่หักเงินอัตโนมัติ · ไม่มีทางผ่านฟรี)', function () {
+  var s = game(2);
+  s.towns[0].owner = 1;
+  s.towns[0].level = 3;
+  var g0 = s.players[0].gold;
+  var g1 = s.players[1].gold;
+  moveTo(s, 0, 2); // ช่อง 2 = เมืองแรก
+  assert.strictEqual(s.phase, 'decide');
+  assert.strictEqual(s.pending.kind, 'visit');
+  assert.strictEqual(s.pending.town, 0);
+  assert.strictEqual(s.players[0].gold, g0, 'ยังไม่หักเงิน');
+  assert.strictEqual(s.players[1].gold, g1);
+  assert.strictEqual(R.decider(s), 0, 'คนแวะเป็นคนเลือก');
+  // ทางอื่นทั้งหมดใช้ไม่ได้ (ไม่มีผ่านฟรี)
+  ['skip', 'pass', 'leave', 'fight', 'roll'].forEach(function (t) {
+    assert.strictEqual(R.act(s, { type: t }), null, t + ' ต้องใช้ไม่ได้');
+  });
+  assert.strictEqual(R.act(s, { type: 'invest', levels: 0 }), null);
+  assert.strictEqual(s.pending.kind, 'visit');
+  assert.strictEqual(s.players[0].gold, g0);
+});
+
+test('พักค้างคืน = จ่ายค่าผ่านทางให้เจ้าของ (เงินรวมไม่หาย) + พลังชีวิตเต็ม', function () {
   var s = game(2);
   s.towns[0].owner = 1;
   s.towns[0].level = 3;
   var before = s.players[0].gold + s.players[1].gold;
   var fee = R.toll(s.towns[0]);
-  moveTo(s, 0, 2); // ช่อง 2 = เมืองแรก
+  moveTo(s, 0, 2);
+  s.players[0].hp = 4;
+  var evs = R.act(s, { type: 'rest' });
+  assert.ok(evs);
   assert.strictEqual(s.players[1].gold + s.players[0].gold, before);
   assert.strictEqual(s.players[0].st.tollPaid, fee);
+  assert.strictEqual(s.players[1].st.tollGot, fee);
+  assert.strictEqual(s.players[0].hp, s.players[0].mhp, 'พลังชีวิตเต็ม');
+  assert.ok(kinds(evs).indexOf('toll') !== -1);
   assert.strictEqual(s.turn, 1);
 });
 
-test('เงินไม่พอจ่ายค่าผ่านทาง = จ่ายเท่าที่มี นับว่าหมดตัว', function () {
+test('พักค้างคืน: เทศกาล ×2 · ตราผ่านแดนครึ่งเดียว ยังใช้ตามเดิม', function () {
+  var s = game(2);
+  s.towns[0].owner = 1;
+  s.towns[0].level = 2;
+  s.fest = 3;
+  moveTo(s, 0, 2);
+  R.act(s, { type: 'rest' });
+  assert.strictEqual(s.players[0].st.tollPaid, R.toll(s.towns[0]) * 2);
+  var c = game(2);
+  c.towns[0].owner = 1;
+  c.towns[0].level = 4;
+  c.players[0].ch = R.CHARMS.map(function (x) { return x.id; }).indexOf('seal');
+  moveTo(c, 0, 2);
+  assert.strictEqual(R.visitInfo(c, 0, 0).fee, Math.round(R.toll(c.towns[0]) * 0.5));
+  R.act(c, { type: 'rest' });
+  assert.strictEqual(c.players[0].st.tollPaid, Math.round(R.toll(c.towns[0]) * 0.5));
+});
+
+test('เงินไม่พอค่าพัก = ยังพักได้ จ่ายเท่าที่มี นับว่าหมดตัว (พลังชีวิตเต็ม)', function () {
   var s = game(2);
   s.towns[0].owner = 1;
   s.towns[0].level = 5;
   s.players[0].gold = 5;
   moveTo(s, 0, 2);
+  s.players[0].hp = 3;
+  var g1 = s.players[1].gold;
+  R.act(s, { type: 'rest' });
+  assert.strictEqual(s.players[0].gold, 0);
+  assert.strictEqual(s.players[1].gold, g1 + 5);
+  assert.strictEqual(s.players[0].st.broke, 1);
+  assert.strictEqual(s.players[0].hp, s.players[0].mhp);
+});
+
+// ปล้นโดยกำหนดผลเต๋า: หา seed ที่ทอยออกมาได้ (คนปล้น a, เจ้าเมือง b) ตามต้องการ
+function robWith(level, a, b, setup) {
+  for (var seed = 1; seed < 20000; seed++) {
+    var s = game(2, 9);
+    s.towns[0].owner = 1;
+    s.towns[0].level = level;
+    moveTo(s, 0, 2);
+    if (setup) setup(s);
+    s.seed = seed;
+    var probe = clone(s);
+    var evs = R.act(probe, { type: 'rob' });
+    var e = evs.filter(function (x) {
+      return x.k === 'rob';
+    })[0];
+    if (e.a === a && e.b === b) {
+      var real = R.act(s, { type: 'rob' });
+      return { s: s, e: real.filter(function (x) { return x.k === 'rob'; })[0], evs: real };
+    }
+  }
+  throw new Error('หา seed ไม่เจอ');
+}
+
+test('ปล้นสำเร็จ: เจ้าเมืองจ่าย 3 เท่าของค่าผ่านทาง · สถิติครบ', function () {
+  var r = robWith(1, 5, 2);
+  var s = r.s;
+  var fee = R.toll(s.towns[0]);
+  assert.strictEqual(r.e.ok, true);
+  assert.strictEqual(r.e.v, fee * 3);
+  assert.strictEqual(r.e.bonus, 0, 'เมืองระดับ 1 เจ้าเมืองไม่มีแต้มบวก');
+  assert.strictEqual(s.players[0].gold, R.START_GOLD + fee * 3);
+  assert.strictEqual(s.players[1].gold, R.START_GOLD + 45 - fee * 3);
+  var st = s.players[0].st;
+  assert.strictEqual(st.robTry, 1);
+  assert.strictEqual(st.robWin, 1);
+  assert.strictEqual(st.robGot, fee * 3);
+  assert.strictEqual(s.players[1].st.defLost, fee * 3);
+  assert.strictEqual(st.tollPaid, 0, 'ปล้นไม่นับเป็นค่าผ่านทาง');
+  assert.strictEqual(s.turn, 1);
+});
+
+test('ปล้นไม่สำเร็จ: จ่ายค่าปรับ 2 เท่าให้เจ้าเมือง · ทอยเสมอ = เจ้าเมืองชนะ', function () {
+  var r = robWith(1, 4, 4);
+  var s = r.s;
+  var fee = R.toll(s.towns[0]);
+  assert.strictEqual(r.e.ok, false, 'เสมอ = ปล้นไม่สำเร็จ');
+  assert.strictEqual(r.e.v, fee * 2);
+  assert.strictEqual(s.players[0].gold, R.START_GOLD - fee * 2);
+  assert.strictEqual(s.players[1].gold, R.START_GOLD + 45 + fee * 2);
+  assert.strictEqual(s.players[0].st.robLost, fee * 2);
+  assert.strictEqual(s.players[1].st.defGot, fee * 2);
+  assert.strictEqual(s.players[0].st.robWin, 0);
+  var r2 = robWith(1, 2, 5);
+  assert.strictEqual(r2.e.ok, false);
+});
+
+test('ปล้น: เจ้าเมืองระดับสูงได้แต้มบวก (ทอยสูงกว่าแต่ไม่พ้นแต้มบวก = ไม่สำเร็จ) · โอกาสตรงสูตร', function () {
+  assert.strictEqual(R.robBonus({ level: 1 }), 0);
+  for (var lv = 1; lv <= R.MAX_TOWN_LEVEL; lv++) {
+    assert.ok(R.robBonus({ level: lv }) >= R.robBonus({ level: Math.max(1, lv - 1) }), 'แต้มบวกไม่ลดตามระดับ');
+  }
+  var lvB = 0;
+  for (lv = 1; lv <= R.MAX_TOWN_LEVEL; lv++) if (!lvB && R.robBonus({ level: lv }) > 0) lvB = lv;
+  assert.ok(lvB > 0, 'ต้องมีระดับที่เจ้าเมืองได้แต้มบวก');
+  var bonus = R.robBonus({ level: lvB });
+  // คนปล้นทอยสูงกว่า 1 แต้ม แต่ไม่พ้นแต้มบวก = ไม่สำเร็จ
+  var r = robWith(lvB, 4, 4 - bonus);
+  assert.strictEqual(r.e.bonus, bonus);
+  assert.strictEqual(r.e.ok, false);
+  // พ้นแต้มบวก = สำเร็จ
+  var r2 = robWith(lvB, 6, 5 - bonus);
+  assert.strictEqual(r2.e.ok, true);
+  // โอกาส: ไม่มีแต้มบวก = 15/36 · +1 = 10/36 · +2 = 6/36
+  assert.strictEqual(R.robChance({ level: 1 }), 15 / 36);
+  var want = { 0: 15 / 36, 1: 10 / 36, 2: 6 / 36, 3: 3 / 36 };
+  for (lv = 1; lv <= R.MAX_TOWN_LEVEL; lv++) assert.strictEqual(R.robChance({ level: lv }), want[R.robBonus({ level: lv })]);
+});
+
+test('ปล้นสำเร็จแต่เจ้าเมืองเงินน้อย = ได้เท่าที่เจ้าเมืองมี (เจ้าเมืองไม่นับว่าหมดตัว)', function () {
+  var r = robWith(3, 6, 1, function (s) {
+    s.players[1].gold = 7;
+  });
+  var s = r.s;
+  assert.strictEqual(r.e.ok, true);
+  assert.strictEqual(r.e.v, 7);
+  assert.strictEqual(s.players[1].gold, 0);
+  assert.strictEqual(s.players[1].st.broke, 0);
+  assert.strictEqual(s.players[0].gold, R.START_GOLD + 7);
+});
+
+test('ปล้นไม่สำเร็จแต่เงินไม่พอค่าปรับ = จ่ายเท่าที่มี นับว่าหมดตัว (ข้อความหมดตัวขึ้นหลังผลปล้น)', function () {
+  var r = robWith(1, 1, 6, function (s) {
+    s.players[0].gold = 10;
+  });
+  var s = r.s;
+  assert.strictEqual(r.e.ok, false);
+  assert.strictEqual(r.e.v, 10);
   assert.strictEqual(s.players[0].gold, 0);
   assert.strictEqual(s.players[0].st.broke, 1);
+  var k = kinds(r.evs);
+  assert.ok(k.indexOf('rob') < k.indexOf('broke'));
+});
+
+test('ปล้น: ฐาน 3×/2× ใช้ค่าผ่านทางเดียวกับค่าพัก (รวมเทศกาล ×2)', function () {
+  var r = robWith(1, 6, 1, function (s) {
+    s.fest = 3;
+  });
+  assert.strictEqual(r.e.fee, R.toll(r.s.towns[0]) * 2);
+  assert.strictEqual(r.e.v, R.toll(r.s.towns[0]) * 2 * 3);
+});
+
+test('คอมเลือก พัก/ปล้น ได้ทั้งสองแบบ (ไม่ปล้นทุกครั้ง ไม่พักทุกครั้ง)', function () {
+  var n = { rest: 0, rob: 0 };
+  for (var g = 0; g < 150; g++) {
+    var s = game(3, 8100 + g, 'mid', R.MAP_IDS[g % 2]);
+    while (s.phase !== 'over') {
+      var a = R.cpuAct(s);
+      if (s.phase === 'decide' && s.pending.kind === 'visit') n[a.type]++;
+      assert.ok(R.act(s, a));
+    }
+  }
+  assert.ok(n.rest > 50 && n.rob > 50, JSON.stringify(n));
 });
 
 test('ค่าผ่านทางเพิ่มตามระดับเมือง', function () {
@@ -607,15 +870,15 @@ test('เลเวลอัปเมื่อค่าประสบการ�
 
 /* ---------- ร้านค้า / อุปกรณ์ / เครื่องราง ---------- */
 
-test('ร้านค้า: อาวุธ/เกราะ 4 ขั้นอัปเกรดทีละขั้น · ค่าพลังตรงตาราง · ของใช้มีได้ไม่เกินเพดาน', function () {
-  assert.strictEqual(R.WEAPONS.length, 4);
-  assert.strictEqual(R.ARMORS.length, 4);
-  for (var i = 1; i < 4; i++) {
+test('ร้านค้า: อาวุธ/เกราะ 6 ขั้นอัปเกรดทีละขั้น · ค่าพลังตรงตาราง · ของใช้มีได้ไม่เกินเพดาน', function () {
+  assert.strictEqual(R.WEAPONS.length, 6);
+  assert.strictEqual(R.ARMORS.length, 6);
+  for (var i = 1; i < 6; i++) {
     assert.ok(R.WEAPONS[i].atk > R.WEAPONS[i - 1].atk && R.WEAPONS[i].price > R.WEAPONS[i - 1].price);
     assert.ok(R.ARMORS[i].def > R.ARMORS[i - 1].def && R.ARMORS[i].price > R.ARMORS[i - 1].price);
   }
   var s = game(2);
-  s.players[0].gold = 5000;
+  s.players[0].gold = 10000; // อาวุธ + เกราะครบ 6 ขั้น + ของใช้เต็มกระเป๋า ~5,300
   moveTo(s, 0, 6); // ช่อง 6 = ร้าน
   assert.strictEqual(s.pending.kind, 'shop');
   R.ITEM_IDS.forEach(function (id) {
@@ -625,7 +888,12 @@ test('ร้านค้า: อาวุธ/เกราะ 4 ขั้นอ�
   var p = s.players[0];
   var atk = R.atkOf(p);
   var def = R.defOf(p);
-  for (var w = 0; w < 4; w++) {
+  for (var w = 0; w < 6; w++) {
+    // ร้านเสนอขั้นถัดไปทีละขั้นเสมอ
+    var offer = R.shopList(p).filter(function (it) {
+      return it.id === 'w';
+    })[0];
+    assert.strictEqual(offer.name, R.WEAPONS[w].name, 'ร้านเสนออาวุธขั้น ' + (w + 1));
     R.act(s, { type: 'buy', item: 'w' });
     assert.strictEqual(R.atkOf(p), atk + R.WEAPONS[w].atk);
     R.act(s, { type: 'buy', item: 'ar' });
@@ -742,6 +1010,7 @@ test('เครื่องรางแต่ละชิ้นทำงาน: 
   c.players[0].ch = charm('seal');
   assert.strictEqual(R.tollFor(c, c.towns[0], 0), Math.round(R.toll(c.towns[0]) * 0.5));
   moveTo(c, 0, 2);
+  R.act(c, { type: 'rest' });
   assert.strictEqual(c.players[0].st.tollPaid, Math.round(R.toll(c.towns[0]) * 0.5));
   // ค่าประสบการณ์
   var d = game(2);
@@ -759,6 +1028,181 @@ test('เครื่องรางแต่ละชิ้นทำงาน: 
   assert.strictEqual(f.players[0].skip, 0, 'ไม่ต้องพักฟื้น');
   assert.strictEqual(f.players[0].gold, 185, 'เหรียญหล่นครึ่งเดียว (7.5%)');
   assert.strictEqual(f.players[0].hp, f.players[0].mhp);
+});
+
+test('อุปกรณ์ขั้น 5–6: ร้านเสนอหลังซื้อขั้น 4 · นับครึ่งราคาท้ายเกม · แรงกว่าขั้น 4 ชัดเจน', function () {
+  var p = game(2).players[0];
+  p.w = 3;
+  p.ar = 3;
+  p.gold = 5000;
+  var list = R.shopList(p);
+  var w = list.filter(function (it) { return it.id === 'w'; })[0];
+  var ar = list.filter(function (it) { return it.id === 'ar'; })[0];
+  assert.strictEqual(w.name, R.WEAPONS[4].name);
+  assert.strictEqual(ar.name, R.ARMORS[4].name);
+  assert.ok(w.ok && ar.ok);
+  p.w = 5;
+  p.ar = 5;
+  assert.strictEqual(R.gearValue(p), (R.WEAPONS[5].price + R.ARMORS[5].price) * 0.5);
+  assert.ok(R.WEAPONS[5].atk >= R.WEAPONS[3].atk * 1.6, 'อาวุธขั้น 6 แรงกว่าขั้น 4 ชัดเจน');
+  assert.ok(R.ARMORS[5].def >= R.ARMORS[3].def * 1.6);
+  assert.ok(
+    R.shopList(p).every(function (it) {
+      return it.id !== 'w' && it.id !== 'ar';
+    }),
+    'ขั้น 6 แล้วไม่มีขายต่อ'
+  );
+});
+
+/* ---------- ของช่วยรบ (v9) ---------- */
+
+function toBattle(seed) {
+  var s = game(2, seed || 11);
+  moveTo(s, 0, 3); // ป่ามอนสเตอร์
+  assert.strictEqual(s.phase, 'battle');
+  s.battle.hp = 200;
+  s.battle.mhp = 200;
+  return s;
+}
+
+test('ของช่วยรบมีขายในร้าน (กลุ่มแยก) · มีเพดาน · ไม่เสียยก', function () {
+  R.FIGHT_ITEMS.forEach(function (id) {
+    assert.ok(R.ITEMS[id] && R.ITEMS[id].max >= 1 && R.ITEMS[id].price > 0, id);
+    assert.ok(R.ITEM_IDS.indexOf(id) !== -1, id + ' ต้องอยู่ในร้าน');
+  });
+  var p = game(2).players[0];
+  p.gold = 1000;
+  R.shopList(p)
+    .filter(function (it) { return R.FIGHT_ITEMS.indexOf(it.id) !== -1; })
+    .forEach(function (it) {
+      assert.strictEqual(it.group, 'fight');
+    });
+  assert.strictEqual(p.oil + p.buckler + p.scroll, 0, 'เริ่มเกมไม่มีของช่วยรบ');
+});
+
+test('น้ำมันเคลือบดาบ: โจมตี +' + R.OIL_ATK + ' จนจบการต่อสู้ · ใช้ซ้ำในการต่อสู้เดียวไม่ได้ · ไม่เสียยก', function () {
+  var s = toBattle();
+  var p = s.players[0];
+  p.oil = 2;
+  var hp = p.hp;
+  var evs = R.act(s, { type: 'use', item: 'oil' });
+  assert.ok(evs && kinds(evs).indexOf('fight-item') !== -1);
+  assert.strictEqual(p.oil, 1);
+  assert.strictEqual(s.battle.oil, R.OIL_ATK);
+  assert.strictEqual(s.battle.n, 0, 'ไม่เสียยก');
+  assert.strictEqual(p.hp, hp, 'อีกฝ่ายไม่ได้สวน');
+  assert.strictEqual(R.act(s, { type: 'use', item: 'oil' }), null, 'ใช้ซ้ำไม่ได้');
+  // แรงที่ทำเพิ่มจริง: เทียบยกเดียวกัน (seed เดียวกัน) มี/ไม่มีน้ำมัน
+  var a = clone(s);
+  var b = clone(s);
+  b.battle.oil = 0;
+  a.battle.bias = b.battle.bias = [0, 0, 1]; // ศัตรูป้องกัน → เราโจมตีแรงชนะ
+  R.act(a, { type: 'move', m: 'H' });
+  R.act(b, { type: 'move', m: 'H' });
+  assert.ok(a.battle.last.dealt > b.battle.last.dealt, a.battle.last.dealt + ' > ' + b.battle.last.dealt);
+});
+
+test('โล่ไม้ไผ่สาน: กันการโดนตีครั้งถัดไป (ไม่เจ็บ) แล้วหมด · ใช้ตอนดื่มยาก็กันได้', function () {
+  var s = toBattle();
+  var p = s.players[0];
+  p.buckler = 1;
+  R.act(s, { type: 'use', item: 'buckler' });
+  assert.strictEqual(p.buckler, 0);
+  assert.strictEqual(s.battle.block, 1);
+  s.battle.bias = [0, 1, 0]; // ศัตรูโจมตีแรง → เราป้องกัน = โดนเต็ม ๆ
+  var hp = p.hp;
+  var evs = R.act(s, { type: 'move', m: 'D' });
+  assert.strictEqual(p.hp, hp, 'โล่กันไว้');
+  assert.ok(evs.filter(function (e) { return e.k === 'hit'; })[0].blocked > 0);
+  assert.strictEqual(s.battle.block, 0);
+  R.act(s, { type: 'move', m: 'D' });
+  assert.ok(p.hp < hp, 'ครั้งถัดไปโดนตามปกติ');
+  // ดื่มยาแล้วโดนตีฟรี: โล่กันได้
+  var t = toBattle(12);
+  var q = t.players[0];
+  q.buckler = 1;
+  q.potion = 1;
+  q.hp = 10;
+  R.act(t, { type: 'use', item: 'buckler' });
+  t.battle.bias = [1, 0, 0];
+  R.act(t, { type: 'use', item: 'potion' });
+  assert.strictEqual(q.hp, Math.min(q.mhp, 10 + Math.ceil(q.mhp / 2)));
+});
+
+test('ม้วนคัมภีร์อ่านใจ: บอกท่าอีกฝ่ายยกถัดไป แล้วอีกฝ่ายออกท่านั้นจริง', function () {
+  for (var k = 0; k < 20; k++) {
+    var s = toBattle(100 + k);
+    var p = s.players[0];
+    p.scroll = 1;
+    var evs = R.act(s, { type: 'use', item: 'scroll' });
+    var peek = evs.filter(function (e) { return e.k === 'fight-item'; })[0].peek;
+    assert.ok(R.MOVES.indexOf(peek) !== -1);
+    assert.strictEqual(s.battle.peek, peek);
+    assert.strictEqual(R.act(s, { type: 'use', item: 'scroll' }), null, 'ไม่มีคัมภีร์แล้ว');
+    R.act(s, { type: 'move', m: R.BEATS[peek] });
+    assert.strictEqual(s.battle.last.foe, peek);
+    assert.strictEqual(s.battle.last.took, 0, 'ออกท่าที่ชนะ = ไม่โดน');
+    assert.strictEqual(s.battle.peek, null);
+  }
+});
+
+test('ของช่วยรบใช้กับผู้เฝ้าเมืองได้ · ไม่มีของ = ใช้ไม่ได้', function () {
+  var s = game(2);
+  moveTo(s, 0, 2);
+  R.act(s, { type: 'fight' });
+  assert.strictEqual(s.battle.town, 0);
+  R.FIGHT_ITEMS.forEach(function (id) {
+    assert.strictEqual(R.act(s, { type: 'use', item: id }), null, id);
+  });
+  s.players[0].oil = 1;
+  assert.ok(R.act(s, { type: 'use', item: 'oil' }));
+});
+
+test('ประลอง: น้ำมันดาบ/โล่ไม้ ใช้ได้ (หักของตอนเปิดผล) · คัมภีร์ใช้ไม่ได้ · ของที่ไม่มี = วางแผนไม่ได้', function () {
+  function duel(seed) {
+    var s = game(2, seed);
+    s.players[1].pos = 5;
+    s.players[0].pos = 0;
+    R.act(s, { type: 'roll', forced: 5 });
+    assert.strictEqual(s.pending.kind, 'duel-offer');
+    R.act(s, { type: 'duel', target: 1 });
+    return s;
+  }
+  var s = duel(3);
+  assert.strictEqual(R.act(s, { type: 'plan', moves: ['A', 'A', 'A'], items: ['oil'] }), null, 'ไม่มีน้ำมัน');
+  s.players[0].oil = 1;
+  s.players[0].scroll = 1;
+  assert.strictEqual(R.act(s, { type: 'plan', moves: ['A', 'A', 'A'], items: ['scroll'] }), null, 'คัมภีร์ใช้ในประลองไม่ได้');
+  assert.ok(R.act(s, { type: 'plan', moves: ['A', 'A', 'A'], items: ['oil'] }));
+  s.players[1].buckler = 1;
+  var evs = R.act(s, { type: 'plan', moves: ['A', 'A', 'A'], items: ['buckler'] });
+  var e = evs.filter(function (x) { return x.k === 'duel-result'; })[0];
+  assert.deepStrictEqual(e.used, [['oil'], ['buckler']]);
+  assert.strictEqual(s.players[0].oil, 0);
+  assert.strictEqual(s.players[1].buckler, 0);
+  assert.strictEqual(e.rounds[0].db > 0, true, 'ผู้ท้าโดนตีตามปกติ');
+  assert.strictEqual(e.rounds[0].da, 0, 'ยกแรกโล่ไม้ของอีกฝ่ายกันไว้');
+  assert.ok(e.rounds[0].bb > 0);
+  // เทียบกับไม่มีของ: โจมตีเท่ากันทั้งคู่ → น้ำมันทำให้ยก 2–3 แรงกว่า
+  var t = duel(3);
+  R.act(t, { type: 'plan', moves: ['A', 'A', 'A'] });
+  var e2 = R.act(t, { type: 'plan', moves: ['A', 'A', 'A'] }).filter(function (x) { return x.k === 'duel-result'; })[0];
+  assert.ok(e.rounds[1].da + e.rounds[2].da > e2.rounds[1].da + e2.rounds[2].da);
+});
+
+test('หีบสมบัติให้ของช่วยรบได้ (ไม่เกินเพดาน)', function () {
+  var got = {};
+  for (var g = 0; g < 1500; g++) {
+    var s = game(2, 9000 + g);
+    var evs = moveTo(s, 0, 1);
+    evs.forEach(function (e) {
+      if (e.k === 'chest') got[e.got] = (got[e.got] || 0) + 1;
+    });
+  }
+  R.FIGHT_ITEMS.forEach(function (id) {
+    assert.ok(got[id] > 0, 'หีบต้องให้ ' + id + ' ได้ ' + JSON.stringify(got));
+  });
+  assert.strictEqual(R.CHEST_W.length, 11);
 });
 
 test('ยันต์กันเคราะห์: แพ้การต่อสู้ไม่เสียเหรียญ (ใช้แล้วหมด)', function () {

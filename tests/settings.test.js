@@ -122,10 +122,10 @@ test('วิธีเล่น (ⓘ) ไม่พูดถึง "แถบเ�
   });
 });
 
-test('sw.js CACHE_VERSION = v8.1', function () {
+test('sw.js CACHE_VERSION = v9', function () {
   var m = read('sw.js').match(/CACHE_VERSION = '([^']+)'/);
   assert.ok(m);
-  assert.strictEqual(m[1], 'v8.1');
+  assert.strictEqual(m[1], 'v9');
 });
 
 /* ---------- 3) สไปเดอร์: เล่นต่อ หรือถามจำนวนดอก ---------- */

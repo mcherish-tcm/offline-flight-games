@@ -11,12 +11,31 @@
  */
 'use strict';
 
-var R = require('../games/realm/engine.js');
+/*
+ * v9 เพิ่ม: ตกเมืองคนอื่น เลือก พัก/ปล้น → รายงาน % ปล้น · ปล้นสำเร็จ · เงินที่ย้ายมือต่อครั้ง ·
+ *   รายได้สุทธิของเจ้าเมืองจากคนแวะ (ค่าผ่านทางที่พัก + ค่าปรับคนปล้นพลาด − เงินที่โดนปล้น) ต่อเกม
+ *   ของช่วยรบ (น้ำมันดาบ/โล่ไม้/คัมภีร์) ที่ใช้ไปต่อคนต่อเกม
+ * ตัวเลือกเสริม:
+ *   --bonus=0,0,0,1,1,2   ลองแต้มบวกเจ้าเมืองตามระดับเมือง (ลำดับ = ระดับ 0..5) โดยไม่แก้ engine
+ *   --engine=<ไฟล์>        จำลองด้วย engine อื่น (เช่นรุ่นก่อน v9 เพื่อเทียบ)
+ */
 var args = process.argv.slice(2);
+function opt(name) {
+  for (var i = 0; i < args.length; i++) if (args[i].indexOf('--' + name + '=') === 0) return args[i].slice(name.length + 3);
+  return null;
+}
+var R = require(opt('engine') ? require('path').resolve(opt('engine')) : '../games/realm/engine.js');
 var N = Number(args[0]) || 400;
 var MAPARG = args[1] && args[1].indexOf('--') !== 0 ? args[1] : 'all';
 var STYLES = args.indexOf('--no-styles') === -1;
 var MAPS = MAPARG === 'all' ? R.MAP_IDS : [MAPARG];
+if (opt('bonus') && R.ROB_BONUS) {
+  opt('bonus')
+    .split(',')
+    .forEach(function (v, i) {
+      R.ROB_BONUS[i] = Number(v);
+    });
+}
 
 function pct(x) {
   return (x * 100).toFixed(1) + '%';
@@ -41,6 +60,7 @@ function run(map, length, seats, styles, games, seed0) {
   var lvlN = 0;
   var upTry = 0;
   var upWin = 0;
+  var v = { rest: 0, rob: 0, robWin: 0, restGold: 0, robGot: 0, robLost: 0, ownerNet: 0, items: 0 };
   for (var g = 0; g < games; g++) {
     // หมุนนิสัยตามที่นั่ง เพื่อแยก "ที่นั่ง" ออกจาก "นิสัย"
     var defs = [];
@@ -50,7 +70,30 @@ function run(map, length, seats, styles, games, seed0) {
     }
     var s = R.newGame({ players: defs, length: length, map: map, seed: seed0 + g * 7919 });
     nTowns = s.towns.length;
-    steps += R.autoplay(s);
+    // เล่นทีละการกระทำ (แทน autoplay) เพื่อนับการพัก/ปล้น และของช่วยรบที่ใช้
+    var guard = 0;
+    while (s.phase !== 'over' && guard++ < 20000) {
+      var a = R.cpuAct(s);
+      var evs = R.act(s, a);
+      if (!evs) throw new Error('คอมเลือกการกระทำที่ใช้ไม่ได้: ' + JSON.stringify(a));
+      steps++;
+      evs.forEach(function (e) {
+        if (e.k === 'toll') {
+          v.rest++;
+          v.restGold += e.v;
+        } else if (e.k === 'rob') {
+          v.rob++;
+          if (e.ok) {
+            v.robWin++;
+            v.robGot += e.v;
+          } else v.robLost += e.v;
+        } else if (e.k === 'fight-item') v.items++;
+      });
+    }
+    s.players.forEach(function (p) {
+      var st = p.st;
+      v.ownerNet += (st.tollGot || 0) + (st.defGot || 0) - (st.defLost || 0);
+    });
     var r = s.result;
     if (r.winner < 0) ties++;
     else {
@@ -103,7 +146,16 @@ function run(map, length, seats, styles, games, seed0) {
     upTry: upTry / games,
     upWin: upWin / games,
     byStyle: byStyle,
-    games: games
+    games: games,
+    visits: (v.rest + v.rob) / games,
+    robShare: v.rest + v.rob ? v.rob / (v.rest + v.rob) : 0,
+    robWinRate: v.rob ? v.robWin / v.rob : 0,
+    restAvg: v.rest ? v.restGold / v.rest : 0,
+    robGotAvg: v.robWin ? v.robGot / v.robWin : 0,
+    robLostAvg: v.rob - v.robWin ? v.robLost / (v.rob - v.robWin) : 0,
+    robNetAvg: v.rob ? (v.robGot - v.robLost) / v.rob : 0,
+    ownerNet: v.ownerNet / games,
+    items: v.items / games / seats
   };
 }
 
@@ -157,6 +209,27 @@ MAPS.forEach(function (map, mi) {
           '/' +
           r.upTry.toFixed(1) +
           ' ครั้ง/เกม (สำเร็จ/ลอง)'
+      );
+      console.log(
+        '      แวะเมืองคนอื่น ' +
+          r.visits.toFixed(1) +
+          ' ครั้ง/เกม · ปล้น ' +
+          pct(r.robShare) +
+          ' (สำเร็จ ' +
+          pct(r.robWinRate) +
+          ') · พักจ่ายเฉลี่ย ' +
+          r.restAvg.toFixed(0) +
+          ' · ปล้นได้เฉลี่ย ' +
+          r.robGotAvg.toFixed(0) +
+          ' / ปล้นพลาดเสียเฉลี่ย ' +
+          r.robLostAvg.toFixed(0) +
+          ' · คนปล้นได้สุทธิต่อครั้ง ' +
+          r.robNetAvg.toFixed(0) +
+          ' · เจ้าเมืองได้สุทธิจากคนแวะ ' +
+          r.ownerNet.toFixed(0) +
+          '/เกม · ใช้ของช่วยรบ ' +
+          r.items.toFixed(2) +
+          ' ชิ้น/คน/เกม'
       );
     });
   });
