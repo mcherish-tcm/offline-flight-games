@@ -3,7 +3,7 @@
  * แก้ไฟล์ใดก็ตามแล้วจะส่งขึ้นเว็บ → เพิ่มเลข CACHE_VERSION ทุกครั้ง
  * (มือถือจะเห็นแถบ "มีเวอร์ชันใหม่ — แตะเพื่อรีโหลด")
  */
-const CACHE_VERSION = 'v6';
+const CACHE_VERSION = 'v7';
 const CACHE_PREFIX = 'flightgames-';
 const CACHE_NAME = CACHE_PREFIX + CACHE_VERSION;
 

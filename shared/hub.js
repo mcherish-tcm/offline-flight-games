@@ -260,6 +260,44 @@
     FG.toast('ติดตั้งแล้ว เปิดจากไอคอนบนหน้าจอได้เลย');
   });
 
+  /* ---------- ส่งลิงก์ให้เพื่อน (ลำดับ: หน้าต่างแชร์ของเครื่อง → คัดลอก → ช่องลิงก์ให้เลือกเอง · ดู shared/share.js) ---------- */
+  function showLinkBox() {
+    var input = document.createElement('input');
+    input.type = 'text';
+    input.readOnly = true;
+    input.className = 'share-box';
+    input.value = window.FG_SHARE_URL || 'https://mcherish-tcm.github.io/offline-flight-games/';
+    input.setAttribute('aria-label', 'ลิงก์ของเว็บเกม');
+    input.addEventListener('focus', function () {
+      input.select();
+    });
+    FG.sheet({
+      title: 'ส่งลิงก์ให้เพื่อน',
+      text: 'แตะค้างที่ลิงก์ แล้วเลือก <b>คัดลอก</b> ส่งให้เพื่อนทางแชทได้เลย',
+      body: input,
+      actions: [{ label: 'ปิด', primary: true }]
+    });
+    setTimeout(function () {
+      try {
+        input.focus({ preventScroll: true });
+        input.select();
+      } catch (e) {
+        /* เลือกข้อความไม่ได้ก็ยังเห็นลิงก์ */
+      }
+    }, 60);
+  }
+
+  document.getElementById('share-btn').addEventListener('click', function () {
+    if (typeof window.FG_shareLink !== 'function') {
+      showLinkBox();
+      return;
+    }
+    window.FG_shareLink().then(function (r) {
+      if (r === 'copied') FG.toast('คัดลอกลิงก์แล้ว');
+      else if (r === 'box') showLinkBox();
+    });
+  });
+
   // กลับจากหน้าเกมด้วยปุ่มย้อน (bfcache) → อัปเดตสถิติ
   window.addEventListener('pageshow', function (e) {
     if (e.persisted) renderLists();
