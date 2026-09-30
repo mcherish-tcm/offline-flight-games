@@ -898,7 +898,7 @@
       .map(function (x, k) {
         var p = P(x.p);
         return (
-          '<tr' + (k === 0 && r.winner >= 0 ? ' class="is-first"' : '') + '><th>' + (k + 1) + '</th><td>' + dot(x.p) + esc(p.name) + '</td><td class="num">' + FG.fmtNum(x.gold) + '</td><td class="num">' + FG.fmtNum(x.towns) + ' <small>(' + x.count + ')</small></td><td class="num"><b>' + FG.fmtNum(x.total) + '</b></td></tr>'
+          '<tr' + (k === 0 && r.winner >= 0 ? ' class="is-first"' : '') + '><th>' + (k + 1) + '</th><td>' + dot(x.p) + esc(p.name) + '</td><td class="num">' + FG.fmtNum(x.gold) + '</td><td class="num">' + FG.fmtNum(x.towns) + ' <small>(' + x.count + ')</small></td><td class="num">' + FG.fmtNum(x.gear || 0) + '</td><td class="num"><b>' + FG.fmtNum(x.total) + '</b></td></tr>'
         );
       })
       .join('');
@@ -910,7 +910,8 @@
     var html =
       '<p class="rl-ov__kicker">จบ ' + s.rounds + ' รอบ</p>' +
       '<h2 class="rl-ov__title rl-win">' + (r.winner < 0 ? 'เสมอกัน!' : dot(r.winner) + esc(P(r.winner).name) + ' ชนะ!') + '</h2>' +
-      '<table class="rl-rank"><thead><tr><th></th><th>ผู้เล่น</th><th>เงิน</th><th>เมือง</th><th>รวม</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+      '<table class="rl-rank"><thead><tr><th></th><th>ผู้เล่น</th><th>เงิน</th><th>เมือง</th><th>อุปกรณ์ <small>(ครึ่งราคา)</small></th><th>รวม</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+      '<p class="rl-note">คะแนนรวม = เงิน + มูลค่าเมือง + อุปกรณ์ที่ถืออยู่ (อาวุธ เกราะ เครื่องราง) นับครึ่งราคาซื้อ · ของใช้ไม่นับ</p>' +
       '<p class="rl-note">' + facts + '</p>' +
       '<div class="rl-ov__actions"><button type="button" class="btn" data-see="1">ดูกระดาน</button><button type="button" class="btn btn--primary" data-new="1">เกมใหม่</button></div>';
     showOv(html, 'over');
@@ -1000,7 +1001,7 @@
       'โจมตี ' + R.atkOf(p) + (p.w >= 0 ? ' (' + esc(R.WEAPONS[p.w].name) + ' ขั้น ' + (p.w + 1) + ')' : '') + ' · ป้องกัน ' + R.defOf(p) + (p.ar >= 0 ? ' (' + esc(R.ARMORS[p.ar].name) + ' ขั้น ' + (p.ar + 1) + ')' : '') + '<br>' +
       'เครื่องราง: ' + (charm ? '<b>' + esc(charm.name) + '</b> — ' + esc(charm.note) : 'ยังไม่มี') + '<br>' +
       esc(bagText(p)) + '<br>เงิน ' + FG.fmtNum(p.gold) + '<br>' +
-      'เมือง: ' + (towns ? esc(towns) : 'ยังไม่มี') + '<br>ทรัพย์รวม (เงิน + มูลค่าเมือง): <b>' + FG.fmtNum(R.total(s, i)) + '</b>';
+      'เมือง: ' + (towns ? esc(towns) : 'ยังไม่มี') + '<br>อุปกรณ์ (ครึ่งราคา): ' + FG.fmtNum(R.gearValue(p)) + '<br>ทรัพย์รวม (เงิน + มูลค่าเมือง + อุปกรณ์ครึ่งราคา): <b>' + FG.fmtNum(R.total(s, i)) + '</b>';
     FG.sheet({ title: esc(p.name) + (p.cpu ? ' (คอม)' : ''), text: text, actions: [{ label: 'ปิด', primary: true }] });
   }
 

@@ -6,7 +6,7 @@
  *
  * รายงานต่อ แผนที่ × ความยาว (สั้น/กลาง/ยาว) × จำนวนผู้เล่น (2/3):
  *   อัตราชนะแต่ละที่นั่ง (ได้เปรียบคนเดินก่อนไหม) · เมืองที่ถูกยึดเฉลี่ย · % เกมที่มีคนหมดตัว
- *   ช่องว่างคะแนนที่ 1 กับที่ 2 · อุปกรณ์เฉลี่ย · แล้วแข่ง "นิสัยคอม" ต่างแบบกัน ดูว่ามีแนวไหนชนะขาดไหม
+ *   ช่องว่างคะแนนที่ 1 กับที่ 2 · อุปกรณ์เฉลี่ย (+ คะแนนที่ได้จากอุปกรณ์ครึ่งราคา) · แล้วแข่ง "นิสัยคอม" ต่างแบบกัน ดูว่ามีแนวไหนชนะขาดไหม
  *   (รวมแนว ทุ่มซื้ออุปกรณ์ / ไม่ซื้ออุปกรณ์ และบังคับเครื่องรางแต่ละชิ้น)
  */
 'use strict';
@@ -33,6 +33,7 @@ function run(map, length, seats, styles, games, seed0) {
   var levels = 0;
   var towns = 0;
   var gear = 0;
+  var gearScore = 0;
   var charms = 0;
   var byStyle = {};
   var nTowns = 0;
@@ -78,6 +79,7 @@ function run(map, length, seats, styles, games, seed0) {
     s.players.forEach(function (p) {
       levels += p.lv;
       gear += p.w + 1 + p.ar + 1;
+      gearScore += R.gearValue(p);
       if (p.ch >= 0) charms++;
       upTry += p.st.upTry || 0;
       upWin += p.st.upWin || 0;
@@ -95,6 +97,7 @@ function run(map, length, seats, styles, games, seed0) {
     avgTotal: totals / games / seats,
     avgLv: levels / games / seats,
     gear: gear / games / seats,
+    gearScore: gearScore / games / seats,
     charms: charms / games / seats,
     townLv: lvlN ? lvlSum / lvlN : 0,
     upTry: upTry / games,
@@ -143,7 +146,9 @@ MAPS.forEach(function (map, mi) {
           r.avgLv.toFixed(1) +
           ' · อุปกรณ์ ' +
           r.gear.toFixed(1) +
-          ' ขั้น · มีเครื่องราง ' +
+          ' ขั้น (นับเป็นคะแนน ' +
+          r.gearScore.toFixed(0) +
+          ') · มีเครื่องราง ' +
           pct(r.charms) +
           ' · ระดับเมืองเฉลี่ย ' +
           r.townLv.toFixed(2) +

@@ -653,6 +653,70 @@ test('เครื่องราง: ใส่ได้ชิ้นเดีย
   assert.strictEqual(R.act(s, { type: 'buy', item: 'ch2' }), null);
 });
 
+test('คะแนนท้ายเกม: อุปกรณ์ที่ถืออยู่ (อาวุธ เกราะ เครื่องราง) นับ 50% ของราคาซื้อ · ของใช้ไม่นับ · ขั้นเก่าที่ถูกแทนไม่นับ', function () {
+  var s = game(2);
+  var p = s.players[0];
+  var base = R.total(s, 0);
+  assert.strictEqual(R.gearValue(p), 0, 'ตัวเปล่า = 0');
+  assert.strictEqual(R.GEAR_RATE, 0.5);
+  // ของใช้ไม่นับ
+  R.ITEM_IDS.forEach(function (id) {
+    p[id] = R.ITEMS[id].max;
+  });
+  assert.strictEqual(R.gearValue(p), 0, 'ของใช้ไม่นับ');
+  assert.strictEqual(R.total(s, 0), base);
+  // อาวุธ
+  p.w = 0;
+  assert.strictEqual(R.gearValue(p), R.WEAPONS[0].price * 0.5);
+  assert.strictEqual(R.total(s, 0), base + R.WEAPONS[0].price * 0.5);
+  // อัปเกรดอาวุธ: นับเฉพาะขั้นที่ถืออยู่ (ไม่นับขั้นเก่าซ้ำ)
+  p.w = 2;
+  assert.strictEqual(R.gearValue(p), R.WEAPONS[2].price * 0.5);
+  // เกราะ + เครื่องราง
+  p.ar = 1;
+  p.ch = 3;
+  var expect = (R.WEAPONS[2].price + R.ARMORS[1].price + R.CHARMS[3].price) * 0.5;
+  assert.strictEqual(R.gearValue(p), expect);
+  assert.strictEqual(R.total(s, 0), base + expect);
+  // เปลี่ยนเครื่องราง = นับเฉพาะชิ้นใหม่
+  p.ch = 0;
+  assert.strictEqual(R.gearValue(p), (R.WEAPONS[2].price + R.ARMORS[1].price + R.CHARMS[0].price) * 0.5);
+  // ซื้อจริงในร้าน: เงินลดเต็มราคา แต่ทรัพย์รวมลดแค่ครึ่งเดียว
+  var s2 = game(2);
+  s2.players[0].gold = 1000;
+  moveTo(s2, 0, 6);
+  var t0 = R.total(s2, 0);
+  R.act(s2, { type: 'buy', item: 'w' });
+  assert.strictEqual(R.total(s2, 0), t0 - R.WEAPONS[0].price * 0.5);
+  R.act(s2, { type: 'buy', item: 'potion' });
+  assert.strictEqual(R.total(s2, 0), t0 - R.WEAPONS[0].price * 0.5 - R.ITEMS.potion.price, 'ของใช้ซื้อแล้วทรัพย์รวมลดเต็มราคา');
+  // เซฟเก่าที่ไม่มีช่อง ch ก็คำนวณได้
+  assert.strictEqual(R.gearValue({ gold: 100, w: -1, ar: -1 }), 0);
+});
+
+test('จบเกม: อันดับ/ผู้ชนะนับอุปกรณ์ครึ่งราคา · standings มีช่อง gear · isLast ใช้ทรัพย์รวมตัวเดียวกัน', function () {
+  var s = game(2);
+  s.players[0].gold = 200;
+  s.players[1].gold = 150;
+  assert.strictEqual(R.isLast(s, 1), true, 'ยังไม่มีอุปกรณ์: คนเงินน้อยสุดรั้งท้าย');
+  s.players[1].w = 3;
+  s.players[1].ar = 3; // ครึ่งราคา (440 + 400) / 2 = 420
+  var rank = R.standings(s);
+  assert.strictEqual(rank[0].p, 1, 'คนถืออุปกรณ์แพงนำ');
+  assert.strictEqual(rank[0].gear, 420);
+  assert.strictEqual(rank[0].total, 150 + 420);
+  assert.strictEqual(rank[1].gear, 0);
+  assert.strictEqual(R.isLast(s, 1), false, 'มีอุปกรณ์แล้วไม่รั้งท้าย');
+  assert.strictEqual(R.isLast(s, 0), true, 'คนไม่มีอุปกรณ์กลายเป็นรั้งท้าย');
+  // คอมล้วนจนจบ: แถวอันดับตรงสูตร
+  var g = game(3, 77, 'short');
+  R.autoplay(g);
+  g.result.rank.forEach(function (x) {
+    assert.strictEqual(x.total, x.gold + x.towns + x.gear);
+    assert.strictEqual(x.gear, R.gearValue(g.players[x.p]));
+  });
+});
+
 test('เครื่องรางแต่ละชิ้นทำงาน: เหรียญมังกร (เงินหลวงเพิ่ม) · ตราผ่านแดน (ค่าผ่านทางครึ่งเดียว) · ตำรา (ค่าประสบการณ์ ×1.5) · ขนนก (แพ้ไม่ต้องพัก เสียครึ่ง)', function () {
   function charm(id) {
     for (var i = 0; i < R.CHARMS.length; i++) if (R.CHARMS[i].id === id) return i;

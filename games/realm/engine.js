@@ -40,6 +40,7 @@
   var MAX_LEVEL = 10;
   var MAX_TOWN_LEVEL = 5;
   var CLAIM_RATE = 0.5; // ค่าฟื้นฟูเมืองหลังชนะผู้เฝ้า = base × 0.5
+  var GEAR_RATE = 0.5; // ท้ายเกมนับอาวุธ/เกราะ/เครื่องรางที่ถืออยู่ชิ้นละ 50% ของราคาซื้อเป็นคะแนน (ของใช้ไม่นับ)
   var INVEST_RATE = 0.6; // ขยายเมือง 1 ระดับ = base × 0.6 (มูลค่าเมืองเพิ่มเท่าที่จ่าย)
   var TOLL_RATE = 0.18; // ค่าผ่านทาง = มูลค่า × (0.18 + 0.05 × (ระดับ-1))
   var TOLL_STEP = 0.05;
@@ -362,8 +363,19 @@
     return v;
   }
 
+  // มูลค่าอุปกรณ์ที่ถืออยู่ = 50% ของราคาซื้อ (เฉพาะชิ้นที่ใส่อยู่ตอนนี้: อาวุธ + เกราะ + เครื่องราง · ของใช้ไม่นับ)
+  // ขั้นเก่าที่ถูกแทนด้วยขั้นใหม่ไม่นับ · ไม่ต้องเก็บค่าเพิ่มในเซฟ (คำนวณจาก p.w / p.ar / p.ch)
+  function gearValue(p) {
+    var v = 0;
+    if (p.w >= 0 && WEAPONS[p.w]) v += WEAPONS[p.w].price;
+    if (p.ar >= 0 && ARMORS[p.ar]) v += ARMORS[p.ar].price;
+    if (p.ch >= 0 && CHARMS[p.ch]) v += CHARMS[p.ch].price;
+    return Math.round(v * GEAR_RATE);
+  }
+
+  // ทรัพย์รวม (คะแนนท้ายเกม + เช็คคนรั้งท้ายรับเงินหลวงเพิ่ม) = เงิน + มูลค่าเมือง + อุปกรณ์ครึ่งราคา
   function total(s, pi) {
-    return s.players[pi].gold + assets(s, pi);
+    return s.players[pi].gold + assets(s, pi) + gearValue(s.players[pi]);
   }
 
   // ทรัพย์รวมน้อยสุด (ต้องน้อยกว่าทุกคนจริง ๆ ไม่นับเสมอ)
@@ -542,7 +554,7 @@
   function standings(s) {
     return s.players
       .map(function (p, i) {
-        return { p: i, gold: p.gold, towns: assets(s, i), total: total(s, i), count: townsOf(s, i).length };
+        return { p: i, gold: p.gold, towns: assets(s, i), gear: gearValue(p), total: total(s, i), count: townsOf(s, i).length };
       })
       .sort(function (a, b) {
         return b.total - a.total || b.count - a.count || a.p - b.p;
@@ -1537,6 +1549,9 @@
     tollFor: tollFor,
     townsOf: townsOf,
     assets: assets,
+    gearValue: gearValue,
+    isLast: isLast,
+    GEAR_RATE: GEAR_RATE,
     total: total,
     standings: standings,
     shopList: shopList,
