@@ -1404,6 +1404,480 @@ test('คอมขยายเมืองจริง (ต้องสู้ก
   assert.ok(wins / tries >= 0.6, 'สำเร็จ ' + ((wins / tries) * 100).toFixed(0) + '%');
 });
 
+/* ---------- v10: โหมดไม่จำกัดรอบ + บอส ---------- */
+
+function endless(n, seed, map) {
+  return R.newGame({ players: cpus(n || 2), length: 'endless', seed: seed == null ? 42 : seed, map: map });
+}
+
+// ใส่การ์ดบอสไว้ในกองแล้วให้ผู้เล่น 0 เดินไปเปิดที่ศาลา (ช่อง 4)
+function summon(s) {
+  s.boss.stage = 'deck';
+  return moveTo(s, 0, 4);
+}
+
+// ช่องกระดานของเมืองลำดับ k
+function squareOf(s, k) {
+  for (var i = 0; i < s.board.length; i++) if (s.board[i].t === 'town' && s.board[i].town === k) return i;
+  return -1;
+}
+
+// ผู้เล่นคนปัจจุบันเดินไปหยุดที่เมืองลำดับ k (คนอื่นไปยืนช่องอื่นให้พ้นทาง)
+function landOnTown(s, k) {
+  var sq = squareOf(s, k);
+  var me = s.turn;
+  s.players.forEach(function (q, i) {
+    if (i !== me) q.pos = (sq + 7) % s.board.length;
+  });
+  s.players[me].pos = (sq - 1 + s.board.length) % s.board.length;
+  return R.act(s, { type: 'roll', forced: 1 });
+}
+
+// จบตาคนปัจจุบันแบบไม่มีอะไรเกิด: เดินไปแช่น้ำพุร้อน (ช่อง 13 ของแดนมนตร์)
+function restTurn(s) {
+  var me = s.turn;
+  s.players.forEach(function (q, i) {
+    if (i !== me) q.pos = 20;
+  });
+  s.players[me].pos = 11;
+  return R.act(s, { type: 'roll', forced: 2 });
+}
+
+// ตั้งบอสไว้ที่เมืองลำดับ k (เจ้าของ = owner) · ตาของผู้เล่น 0
+function bossAt(n, k, owner, seed) {
+  var s = endless(n, seed);
+  s.towns[k].owner = owner;
+  s.towns[k].level = 2;
+  s.boss.stage = 'out';
+  s.boss.town = k;
+  s.boss.left = 99;
+  return s;
+}
+
+test('ไม่จำกัดรอบ: เกมใหม่ไม่มีจำนวนรอบ (rounds 0) · บอสรออยู่ · ตัวเลือกความยาวมี 4 แบบ · เกมปกติไม่มีบอส', function () {
+  assert.deepStrictEqual(R.LENGTH_IDS, ['short', 'mid', 'long', 'endless']);
+  var s = endless(3);
+  assert.strictEqual(s.endless, true);
+  assert.strictEqual(s.rounds, 0);
+  assert.strictEqual(s.boss.stage, 'wait');
+  assert.strictEqual(s.v, R.VERSION);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(s)), s, 'แปลงเป็น JSON ได้ทั้งก้อน');
+  var f = game(2, 1, 'long');
+  assert.strictEqual(f.endless, false);
+  assert.strictEqual(f.boss, null);
+  assert.strictEqual(f.rounds, 30);
+});
+
+test('ไม่จำกัดรอบ: ไม่จบตามจำนวนรอบ (เล่นเกิน 60 รอบยังไม่จบ) · ความคืบหน้าเกมไม่เกิน 1 · เงินไม่เป็น NaN', function () {
+  var s = endless(3, 11);
+  s.boss.stage = 'dead'; // ปิดบอสไว้ (ทดสอบเฉพาะว่าไม่มีเพดานรอบ)
+  var guard = 0;
+  while (s.round <= 60 && guard++ < 20000) R.act(s, R.cpuAct(s));
+  assert.ok(s.round > 60, 'ต้องเล่นเกิน 60 รอบได้');
+  assert.notStrictEqual(s.phase, 'over');
+  assert.strictEqual(R.progress(s), 1);
+  s.players.forEach(function (p) {
+    assert.ok(isFinite(p.gold) && p.gold >= 0, 'เงินผิด ' + p.gold);
+  });
+  var f = game(2, 3, 'short');
+  f.round = 5;
+  assert.strictEqual(R.progress(f), 5 / 15, 'เกมปกติยังใช้ รอบ/จำนวนรอบ เหมือนเดิม');
+});
+
+test('ไม่จำกัดรอบ: คนแรกถึง Lv 6 = การ์ดบอสลงกอง (ครั้งเดียว) · ไพ่ใบถัดไปของใครก็ได้ = อัญเชิญบอสแน่นอน · กองเดิมไม่ถูกแตะ', function () {
+  var s = endless(2);
+  s.towns[0].owner = 0;
+  s.towns[4].owner = 1;
+  var p = s.players[0];
+  p.lv = 5;
+  p.xp = R.xpNeed(5) - 1;
+  moveTo(s, 0, 3); // ป่ามอนสเตอร์
+  var evs = winFight(s);
+  assert.strictEqual(p.lv, 6);
+  assert.strictEqual(count(kinds(evs), 'boss-card'), 1);
+  assert.strictEqual(s.boss.stage, 'deck');
+  assert.strictEqual(s.boss.lv6, s.round);
+  // ผู้เล่นอีกคนถึง Lv 6 ทีหลัง = ไม่ใส่ซ้ำ
+  var q = s.players[1];
+  q.lv = 5;
+  q.xp = R.xpNeed(5) - 1;
+  assert.strictEqual(s.turn, 1);
+  s.players[0].pos = 20;
+  q.pos = 0;
+  R.act(s, { type: 'roll', forced: 3 });
+  var e2 = winFight(s);
+  assert.strictEqual(q.lv, 6);
+  assert.strictEqual(count(kinds(e2), 'boss-card'), 0, 'การ์ดบอสลงกองครั้งเดียว');
+  // ตาผู้เล่น 0 เปิดไพ่: กองมีไพ่อื่นอยู่ แต่ต้องได้การ์ดบอส
+  s.deck = [0, 1, 2];
+  var e3 = moveTo(s, 0, 4);
+  var card = e3.filter(function (e) {
+    return e.k === 'card';
+  })[0];
+  assert.strictEqual(card.card, 'summon');
+  assert.strictEqual(card.boss, true);
+  assert.deepStrictEqual(s.deck, [0, 1, 2], 'กองไพ่ปกติไม่ถูกแตะ');
+  assert.strictEqual(s.boss.stage, 'out');
+  assert.ok(kinds(e3).indexOf('boss') !== -1);
+  // ใบถัดไป = ไพ่ปกติจากกอง
+  s.turn = 0;
+  s.phase = 'roll';
+  var e4 = moveTo(s, 0, 4);
+  assert.notStrictEqual(
+    e4.filter(function (e) {
+      return e.k === 'card';
+    })[0].card,
+    'summon'
+  );
+});
+
+test('ไม่จำกัดรอบ: เกมจำนวนรอบคงที่ถึง Lv 6 = ไม่มีการ์ดบอส', function () {
+  var s = game(2);
+  var p = s.players[0];
+  p.lv = 5;
+  p.xp = R.xpNeed(5) - 1;
+  moveTo(s, 0, 3);
+  var evs = winFight(s);
+  assert.strictEqual(p.lv, 6);
+  assert.strictEqual(count(kinds(evs), 'boss-card'), 0);
+  assert.strictEqual(s.boss, null);
+});
+
+test('บอสออกที่เมืองที่มีเจ้าของ (สุ่ม) · สถานะ/เหตุการณ์ครบ · ไม่มีเมืองไหนมีเจ้าของ = สุ่มจากทุกเมือง', function () {
+  var seen = {};
+  for (var g = 0; g < 40; g++) {
+    var s = endless(2, 100 + g);
+    s.towns[1].owner = 1;
+    s.towns[6].owner = 0;
+    s.towns[8].owner = 1;
+    var evs = summon(s);
+    assert.strictEqual(s.boss.stage, 'out');
+    assert.ok([1, 6, 8].indexOf(s.boss.town) !== -1, 'ต้องเป็นเมืองที่มีเจ้าของ: ' + s.boss.town);
+    assert.ok(R.bossHere(s, s.boss.town));
+    var be = evs.filter(function (e) {
+      return e.k === 'boss';
+    })[0];
+    assert.strictEqual(be.town, s.boss.town);
+    assert.strictEqual(be.owner, s.towns[s.boss.town].owner);
+    seen[s.boss.town] = 1;
+  }
+  assert.strictEqual(Object.keys(seen).length, 3, 'สุ่มได้ครบทุกเมืองที่มีเจ้าของ');
+  var t = endless(2, 5);
+  summon(t);
+  assert.ok(t.boss.town >= 0 && t.boss.town < t.towns.length, 'ไม่มีเจ้าของเลย = ยังออกได้');
+});
+
+test('บอสย้ายเมืองทุก 1 รอบ (ทุกคนได้เล่น 1 ตาก่อน) ไปเมืองที่มีเจ้าของเมืองอื่น · มีเมืองเดียว = อยู่ที่เดิม', function () {
+  [2, 3].forEach(function (n) {
+    var s = endless(n, 7);
+    s.towns[1].owner = 1;
+    s.towns[6].owner = 0;
+    s.towns[8].owner = 1;
+    summon(s);
+    var at = s.boss.town;
+    var moved = false;
+    for (var k = 0; k < n; k++) {
+      assert.strictEqual(s.boss.town, at, n + ' คน: ยังไม่ครบรอบ ห้ามย้าย (ตาที่ ' + k + ')');
+      var evs = restTurn(s);
+      if (kinds(evs).indexOf('boss-move') !== -1) moved = k === n - 1;
+    }
+    assert.ok(moved, n + ' คน: ต้องย้ายเมื่อครบ 1 รอบพอดี');
+    assert.notStrictEqual(s.boss.town, at);
+    assert.ok([1, 6, 8].indexOf(s.boss.town) !== -1);
+    var at2 = s.boss.town;
+    for (var j = 0; j < n; j++) restTurn(s);
+    assert.notStrictEqual(s.boss.town, at2, 'รอบถัดไปย้ายอีก');
+  });
+  var one = endless(2, 9);
+  one.towns[6].owner = 0;
+  summon(one);
+  assert.strictEqual(one.boss.town, 6);
+  for (var r = 0; r < 6; r++) restTurn(one);
+  assert.strictEqual(one.boss.town, 6, 'มีเมืองที่มีเจ้าของเมืองเดียว = อยู่ที่เดิม');
+});
+
+test('ตกเมืองที่บอสยึด = เลือกสู้บอส/ไม่สู้ · ไม่มีค่าผ่านทาง ปล้น/พักไม่ได้ · ไม่สู้ = ไม่มีอะไรเกิดขึ้น (รวมเจ้าเมืองเอง)', function () {
+  var s = bossAt(2, 3, 1);
+  var g0 = s.players[0].gold;
+  var g1 = s.players[1].gold;
+  landOnTown(s, 3);
+  assert.strictEqual(s.phase, 'decide');
+  assert.strictEqual(s.pending.kind, 'boss');
+  ['rob', 'rest', 'invest', 'leave', 'roll'].forEach(function (t) {
+    assert.strictEqual(R.act(s, { type: t, levels: 1, town: 3 }), null, t + ' ต้องใช้ไม่ได้');
+  });
+  var evs = R.act(s, { type: 'skip' });
+  assert.ok(kinds(evs).indexOf('pass') !== -1);
+  assert.strictEqual(s.players[0].gold, g0);
+  assert.strictEqual(s.players[1].gold, g1);
+  assert.strictEqual(s.turn, 1);
+  assert.strictEqual(s.boss.tries, 0);
+  // เจ้าเมืองตกเมืองตัวเองที่บอสยึด = เจอบอสเหมือนกัน (ไม่ได้ขยาย)
+  s.players[1].gold = 999;
+  landOnTown(s, 3);
+  assert.strictEqual(s.pending.kind, 'boss');
+  assert.strictEqual(R.decider(s), 1);
+});
+
+test('เมืองที่บอสยึดขยายไม่ได้ตอนผ่านลานประตูเมือง (เมืองอื่นยังขยายได้)', function () {
+  var s = bossAt(2, 3, 0);
+  s.towns[0].owner = 0;
+  s.players[0].gold = 500;
+  s.players[1].pos = 5;
+  s.players[0].pos = 26;
+  R.act(s, { type: 'roll', forced: 4 }); // หยุดที่ลานพอดี → สิทธิ์ขยาย 1 เมือง
+  assert.strictEqual(s.pending.kind, 'invest');
+  assert.deepStrictEqual(s.pending.towns, [0], 'เมือง 3 (บอสยึด) ต้องไม่อยู่ในรายการ');
+});
+
+test('สู้บอส: บอสพลังชีวิตเต็มทุกครั้ง (ความเสียหายไม่ค้าง) · ค่าพลังตรงตาราง · ใช้ของช่วยรบได้', function () {
+  var s = bossAt(2, 3, 1);
+  s.players[0].smoke = 2;
+  s.players[0].oil = 1;
+  landOnTown(s, 3);
+  R.act(s, { type: 'fight' });
+  assert.strictEqual(s.phase, 'battle');
+  assert.strictEqual(s.battle.boss, true);
+  assert.strictEqual(s.battle.hp, R.BOSS.hp);
+  assert.strictEqual(s.battle.atk, R.BOSS.atk);
+  assert.strictEqual(s.battle.def, R.BOSS.def);
+  assert.ok(R.act(s, { type: 'use', item: 'oil' }), 'ใช้น้ำมันดาบกับบอสได้');
+  s.battle.hp = 20; // ตีบอสไปเยอะแล้ว
+  R.act(s, { type: 'use', item: 'smoke' }); // หนี
+  assert.strictEqual(s.boss.stage, 'out', 'หนีแล้วบอสยังอยู่');
+  restTurn(s); // ตาผู้เล่น 1
+  landOnTown(s, 3); // ผู้เล่น 0 สู้ใหม่
+  R.act(s, { type: 'fight' });
+  assert.strictEqual(s.battle.hp, R.BOSS.hp);
+  assert.strictEqual(s.boss.tries, 2);
+  assert.strictEqual(s.players[0].st.bossTry, 2);
+});
+
+test('ปราบบอส = จบเกมทันที · คนปราบอันดับ 1 (แม้จนสุด) · ที่เหลือเรียงตามทรัพย์รวม', function () {
+  var s = bossAt(3, 3, 1);
+  s.players[0].gold = 0;
+  s.players[1].gold = 5000;
+  s.players[2].gold = 900;
+  landOnTown(s, 3);
+  R.act(s, { type: 'fight' });
+  var evs = winFight(s);
+  assert.strictEqual(s.phase, 'over');
+  assert.ok(kinds(evs).indexOf('over') !== -1);
+  assert.strictEqual(s.result.slayer, 0);
+  assert.strictEqual(s.result.winner, 0);
+  assert.strictEqual(s.result.rank[0].p, 0);
+  assert.strictEqual(s.result.rank[0].slayer, true);
+  assert.strictEqual(s.result.rank[1].p, 1);
+  assert.strictEqual(s.result.rank[2].p, 2);
+  assert.ok(s.result.rank[1].total >= s.result.rank[2].total);
+  assert.strictEqual(s.boss.stage, 'dead');
+  assert.strictEqual(s.boss.slayer, 0);
+  assert.strictEqual(R.decider(s), -1);
+  assert.strictEqual(R.act(s, { type: 'roll' }), null, 'จบแล้วทำอะไรต่อไม่ได้');
+});
+
+test('แพ้บอส = โทษแพ้ปกติ (เหรียญหล่น 15% + พักฟื้น 1 ตา) · บอสยังอยู่ที่เดิม เกมเดินต่อ', function () {
+  var s = bossAt(2, 3, 1);
+  s.players[0].gold = 200;
+  landOnTown(s, 3);
+  R.act(s, { type: 'fight' });
+  var evs = loseFight(s);
+  assert.ok(kinds(evs).indexOf('lose') !== -1);
+  assert.strictEqual(s.players[0].gold, 170);
+  assert.strictEqual(s.players[0].skip, 1);
+  assert.strictEqual(s.boss.stage, 'out');
+  assert.strictEqual(s.boss.town, 3);
+  assert.notStrictEqual(s.phase, 'over');
+  assert.strictEqual(s.turn, 1);
+});
+
+test('บันทึกกลางเกมตอนบอสออก / กลางการสู้บอส / การ์ดรอในกอง (JSON) แล้วเล่นต่อ = ผลเหมือนเล่นรวดเดียว', function () {
+  var a = endless(3, 21);
+  var guard = 0;
+  while (a.boss.stage !== 'out' && guard++ < 20000) R.act(a, R.cpuAct(a));
+  assert.strictEqual(a.boss.stage, 'out');
+  var b = R.migrate(clone(a));
+  assert.ok(b);
+  assert.deepStrictEqual(b.boss, a.boss);
+  R.autoplay(a, 200000);
+  R.autoplay(b, 200000);
+  assert.strictEqual(a.phase, 'over');
+  assert.deepStrictEqual(a.result, b.result);
+  var c = bossAt(2, 3, 1, 33);
+  landOnTown(c, 3);
+  R.act(c, { type: 'fight' });
+  R.act(c, { type: 'move', m: 'A' });
+  var d = R.migrate(clone(c));
+  assert.strictEqual(d.battle.boss, true);
+  assert.strictEqual(d.battle.hp, c.battle.hp);
+  R.autoplay(c, 200000);
+  R.autoplay(d, 200000);
+  assert.deepStrictEqual(c.result, d.result);
+  var e = endless(2, 44);
+  e.boss.stage = 'deck';
+  var f = R.migrate(clone(e));
+  assert.strictEqual(f.boss.stage, 'deck');
+  summon(f);
+  assert.strictEqual(f.boss.stage, 'out');
+});
+
+test('เซฟรุ่น 3 (v9) โหลดได้เป็นเกมจำนวนรอบเดิม แล้วเล่นจนจบตรงรอบ · เซฟไม่จำกัดที่ไม่มีข้อมูลบอส = เสีย', function () {
+  R.MAP_IDS.forEach(function (map) {
+    ['short', 'long'].forEach(function (len) {
+      var s = game(3, 77, len, map);
+      for (var i = 0; i < 60; i++) R.act(s, R.cpuAct(s));
+      s.v = 3;
+      delete s.endless;
+      delete s.boss;
+      var m = R.migrate(clone(s));
+      assert.ok(m, 'ต้องโหลดได้');
+      assert.strictEqual(m.v, R.VERSION);
+      assert.strictEqual(m.endless, false);
+      assert.strictEqual(m.boss, null);
+      R.autoplay(m);
+      assert.strictEqual(m.phase, 'over');
+      assert.strictEqual(m.round, m.rounds);
+      assert.strictEqual(m.rounds, R.LENGTHS[len]);
+    });
+  });
+  var bad = endless(2);
+  delete bad.boss;
+  assert.strictEqual(R.migrate(clone(bad)), null);
+});
+
+test('คอมเล่นโหมดไม่จำกัดจนจบได้ทั้ง 2 แผนที่ × 2/3 คน · จบด้วยการปราบบอสเสมอ · คนปราบ = ผู้ชนะ', function () {
+  R.MAP_IDS.forEach(function (map) {
+    [2, 3].forEach(function (n) {
+      for (var k = 0; k < 6; k++) {
+        var s = endless(n, 600 + k, map);
+        R.autoplay(s, 200000);
+        assert.strictEqual(s.phase, 'over', map + ' ' + n + ' คน ยังไม่จบ');
+        assert.ok(s.result.slayer >= 0);
+        assert.strictEqual(s.result.winner, s.result.slayer);
+        assert.strictEqual(s.result.rank[0].p, s.result.slayer);
+        assert.ok(s.boss.lv6 > 0 && s.boss.out >= s.boss.lv6);
+        s.players.forEach(function (p) {
+          assert.ok(p.gold >= 0 && p.hp >= 0 && p.hp <= p.mhp);
+        });
+      }
+    });
+  });
+});
+
+test('คอมตัดสินใจสู้บอสตามโอกาสชนะ: Lv 6 ไม่มีอุปกรณ์ = ไม่สู้ · Lv 8 อุปกรณ์ขั้น 4 + ของช่วยรบ = สู้ · ไม่แตะ seed เกม', function () {
+  var weak = bossAt(2, 3, 1, 5);
+  landOnTown(weak, 3);
+  var p = weak.players[0];
+  for (var l0 = 1; l0 < 6; l0++) {
+    p.mhp += 5;
+    p.atk += 2;
+    p.def += 1;
+  }
+  p.lv = 6;
+  p.hp = p.mhp;
+  var seed = weak.seed;
+  assert.deepStrictEqual(R.cpuAct(weak), { type: 'skip' });
+  assert.strictEqual(weak.seed, seed, 'ประเมินโอกาสไม่ใช้ seed เกมจริง');
+  assert.ok(R.bossOdds(weak, 0) < 0.1);
+  var strong = bossAt(2, 3, 1, 5);
+  landOnTown(strong, 3);
+  var q = strong.players[0];
+  for (var l = 1; l < 8; l++) {
+    q.mhp += 5;
+    q.atk += 2;
+    q.def += 1;
+  }
+  q.lv = 8;
+  q.hp = q.mhp;
+  q.w = 3;
+  q.ar = 3;
+  q.oil = 1;
+  q.scroll = 1;
+  q.buckler = 1;
+  q.bomb = 1;
+  q.potion = 2;
+  assert.ok(R.bossOdds(strong, 0) >= 0.4, 'โอกาส ' + R.bossOdds(strong, 0));
+  assert.deepStrictEqual(R.cpuAct(strong), { type: 'fight' });
+});
+
+/* ---------- v10: เหตุผลที่ขยายเมืองไม่ได้ · หยุดที่ลานประตูเมือง = พลังชีวิตเต็ม ---------- */
+
+test('ตกเมืองตัวเองแต่ขยายไม่ได้ = บอกเหตุผล (เต็มระดับ 5 / เงินไม่พอ บอกจำนวน) · กติกาเดิม', function () {
+  var s = game(2);
+  s.towns[0].owner = 0;
+  s.towns[0].level = 5;
+  var evs = moveTo(s, 0, 2);
+  var home = evs.filter(function (e) {
+    return e.k === 'home';
+  })[0];
+  assert.ok(home, 'ต้องมีเหตุการณ์ home');
+  assert.ok(home.t.indexOf('เต็มระดับ 5') !== -1, home.t);
+  assert.strictEqual(home.full, true);
+  assert.strictEqual(s.turn, 1, 'จบตาเหมือนเดิม');
+  var t = game(2);
+  t.towns[0].owner = 0;
+  t.players[0].gold = 10;
+  var e2 = moveTo(t, 0, 2);
+  var h2 = e2.filter(function (e) {
+    return e.k === 'home';
+  })[0];
+  var cost = R.investCost(t.towns[0]);
+  assert.ok(h2.t.indexOf('ระดับ 2') !== -1 && h2.t.indexOf('ต้องมี ' + cost + ' เหรียญ') !== -1 && h2.t.indexOf('ตอนนี้มี 10') !== -1, h2.t);
+  assert.strictEqual(t.players[0].gold, 10, 'ไม่เปลี่ยนเงิน');
+});
+
+test('ผ่านลานประตูเมืองแต่ขยายไม่ได้สักเมือง = บอกเหตุผล (เงินไม่พอ / เต็มทุกเมือง) · ไม่มีเมือง = ไม่ต้องบอก', function () {
+  var s = game(2);
+  s.towns[7].owner = 0; // นครทรายทอง ค่าลงทุน 132
+  s.players[0].gold = 0;
+  s.players[1].pos = 5;
+  s.players[0].pos = 26;
+  var evs = R.act(s, { type: 'roll', forced: 4 }); // หยุดที่ลานพอดี
+  var n = evs.filter(function (e) {
+    return e.k === 'noinvest';
+  })[0];
+  assert.ok(n, 'ต้องบอกเหตุผล');
+  assert.ok(n.t.indexOf('ต้องมี 132 เหรียญ') !== -1 && n.t.indexOf('ตอนนี้มี ' + s.players[0].gold) !== -1, n.t);
+  var f = game(2);
+  f.towns[0].owner = 0;
+  f.towns[0].level = 5;
+  f.players[1].pos = 5;
+  f.players[0].pos = 26;
+  var e2 = R.act(f, { type: 'roll', forced: 4 });
+  assert.ok(
+    e2.some(function (e) {
+      return e.k === 'noinvest' && e.t.indexOf('เต็มระดับ 5') !== -1;
+    })
+  );
+  var z = game(2);
+  z.players[1].pos = 5;
+  z.players[0].pos = 26;
+  var e3 = R.act(z, { type: 'roll', forced: 4 });
+  assert.strictEqual(count(kinds(e3), 'noinvest'), 0);
+});
+
+test('หยุดพอดีที่ลานประตูเมือง = โบนัสเงิน + พลังชีวิตเต็ม · เดินผ่านเฉย ๆ = ไม่ฟื้นพลัง', function () {
+  var s = game(2);
+  s.players[0].hp = 5;
+  s.players[1].pos = 5;
+  s.players[0].pos = 26;
+  var g0 = s.players[0].gold;
+  var evs = R.act(s, { type: 'roll', forced: 4 });
+  assert.strictEqual(s.players[0].hp, s.players[0].mhp);
+  assert.ok(s.players[0].gold >= g0 + R.SALARY + Math.round(R.SALARY / 2));
+  assert.ok(
+    evs.some(function (e) {
+      return e.k === 'gold' && e.t.indexOf('พลังชีวิตเต็ม') !== -1;
+    })
+  );
+  var t = game(2);
+  t.players[0].hp = 5;
+  t.players[1].pos = 5;
+  t.players[0].pos = 28;
+  R.act(t, { type: 'roll', forced: 4 }); // ผ่านลาน → หยุดเมืองว่างช่อง 2
+  assert.strictEqual(t.players[0].hp, 5, 'ผ่านเฉย ๆ ไม่ฟื้น');
+});
+
 // 900 เกม: ค่าคลาดเคลื่อนสุ่ม ~1.6% → กรอบ 27–40% (ผลจริง 3000 เกม ≈ 33/31/35 · ดู tests/realm-sim.js)
 test('สมดุลคร่าว ๆ: 3 คน 900 เกม (แดนมนตร์ + หมู่เกาะ) อัตราชนะทุกที่นั่ง 27–40% · ยึดเมืองได้เฉลี่ย ≥ 3 เมือง', function () {
   R.MAP_IDS.forEach(function (map) {

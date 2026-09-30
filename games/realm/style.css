@@ -1078,3 +1078,110 @@
   font-weight: 700;
   color: var(--color-ink-3);
 }
+
+/* ---------- v10 โหมดไม่จำกัดรอบ: บอส (ราชันอสูรเงาคราม) ----------
+ * ช่องเมืองที่บอสยึด = ไอคอนบอส + กรอบสีครามเรืองแสง · หน้าต่างสู้บอสมีกรอบ/หัวข้อสีบอส · ไพ่อัญเชิญบอส */
+:root {
+  --rl-boss: var(--color-g7);
+}
+
+.rl-cell.t-town.is-boss {
+  --tc: var(--rl-boss);
+  border: 2px solid var(--rl-boss);
+  background: color-mix(in oklch, var(--rl-boss) 30%, var(--color-paper-2));
+  box-shadow: 0 0 0 2px color-mix(in oklch, var(--rl-boss) 40%, transparent);
+  animation: rl-boss-glow 1.6s var(--ease-in-out) infinite alternate;
+}
+
+.rl-cell.is-boss .rl-ico {
+  width: 86%;
+  height: 86%;
+  stroke-width: 2.1;
+}
+
+@keyframes rl-boss-glow {
+  to {
+    box-shadow: 0 0 0 4px color-mix(in oklch, var(--rl-boss) 18%, transparent);
+  }
+}
+
+.rl-round.is-boss {
+  color: var(--rl-boss);
+}
+
+.rl-ov[data-kind="boss"] .rl-ov__box,
+.rl-ov[data-kind="news"] .rl-ov__box {
+  border-top: 4px solid var(--rl-boss);
+}
+
+.rl-boss-kicker {
+  color: var(--rl-boss);
+  font-weight: 700;
+}
+
+.rl-fighter.is-boss .rl-fighter__ico {
+  width: 30px;
+  height: 30px;
+  color: var(--rl-boss);
+}
+
+.rl-fighter.is-boss .rl-fighter__name {
+  font-weight: 800;
+  color: var(--rl-boss);
+}
+
+.rl-bar.is-boss > span {
+  background: var(--rl-boss);
+}
+
+.rl-card.is-boss {
+  --cc: var(--rl-boss);
+}
+
+.rl-news {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2xs);
+  padding: var(--space-md);
+  border-radius: var(--radius-lg);
+  background: color-mix(in oklch, var(--rl-boss) 14%, var(--color-paper-2));
+  text-align: center;
+}
+
+.rl-news__ico {
+  width: 56px;
+  height: 56px;
+  color: var(--rl-boss);
+}
+
+.rl-news__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.rl-news__text {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--color-ink-2);
+}
+
+.rl-rank tr.is-slayer td {
+  color: var(--rl-boss);
+}
+
+/* ความยาวเกม 4 ตัวเลือก: จอแคบ (≤ 380px) แบ่งเป็น 2 แถว × 2 ปุ่ม ไม่บีบป้ายสองบรรทัด */
+@media (max-width: 380px) {
+  .rl-seg.rl-seg--4 {
+    grid-auto-flow: row;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rl-cell.t-town.is-boss {
+    animation: none;
+  }
+}

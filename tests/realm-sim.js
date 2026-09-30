@@ -24,10 +24,32 @@ function opt(name) {
   for (var i = 0; i < args.length; i++) if (args[i].indexOf('--' + name + '=') === 0) return args[i].slice(name.length + 3);
   return null;
 }
+/*
+ * v10 เพิ่ม: โหมดไม่จำกัดรอบ + บอส (ชุด "endless" ทั้ง 2 แผนที่ × 2/3 คน) → รายงาน
+ *   รอบที่มีคนแรกถึง Lv 6 · รอรอบจนบอสออก (รอเปิดไพ่) · บอสออกจนถูกปราบ · ความยาวเกม (รอบ/การกระทำ)
+ *   อัตราชนะบอสตามเลเวล/อุปกรณ์ของคนสู้ · สู้กี่ครั้งกว่าจะปราบ · คนปราบบอสรวยสุดด้วยไหม · ที่นั่ง · หมดตัว
+ *   เพดานกันเกมไม่จบ (เฉพาะในผลจำลอง): --cap=200 รอบ
+ * ตัวเลือกเสริม:
+ *   --endless-only   รันเฉพาะชุดไม่จำกัดรอบ · --no-endless ข้ามชุดนี้
+ *   --boss=hp,atk,def[,bA,bH,bD]   ลองค่าพลังบอสแบบอื่นโดยไม่แก้ engine · --move=<ตา>  ลองความถี่บอสย้ายเมือง (ไม่ใส่ = ทุก 1 รอบ)
+ *   --need=0.25      ลองเกณฑ์โอกาสชนะที่คอมนิสัยปกติยอมสู้บอส
+ */
 var R = require(opt('engine') ? require('path').resolve(opt('engine')) : '../games/realm/engine.js');
 var N = Number(args[0]) || 400;
 var MAPARG = args[1] && args[1].indexOf('--') !== 0 ? args[1] : 'all';
 var STYLES = args.indexOf('--no-styles') === -1;
+var ENDLESS_ONLY = args.indexOf('--endless-only') !== -1;
+var ENDLESS = args.indexOf('--no-endless') === -1 && !!R.BOSS;
+var CAP = Number(opt('cap')) || 200;
+if (opt('boss') && R.BOSS) {
+  var bv = opt('boss').split(',').map(Number);
+  R.BOSS.hp = bv[0];
+  R.BOSS.atk = bv[1];
+  R.BOSS.def = bv[2];
+  if (bv.length >= 6) R.BOSS.bias = bv.slice(3, 6);
+}
+if (opt('move') && R.BOSS_TUNE) R.BOSS_TUNE.move = Number(opt('move'));
+if (opt('need') && R.BOSS_TUNE) R.BOSS_TUNE.need = Number(opt('need'));
 var MAPS = MAPARG === 'all' ? R.MAP_IDS : [MAPARG];
 if (opt('bonus') && R.ROB_BONUS) {
   opt('bonus')
@@ -161,7 +183,7 @@ function run(map, length, seats, styles, games, seed0) {
 
 console.log('ชิงเมืองแดนมนตร์ — จำลองคอมล้วน ' + N + ' เกมต่อชุด · แผนที่ ' + MAPS.join(', ') + '\n');
 
-MAPS.forEach(function (map, mi) {
+if (!ENDLESS_ONLY) MAPS.forEach(function (map, mi) {
   console.log('== ' + R.MAPS[map].name + ' (' + map + ') ==');
   ['short', 'mid', 'long'].forEach(function (len) {
     [2, 3].forEach(function (seats) {
@@ -236,7 +258,7 @@ MAPS.forEach(function (map, mi) {
   console.log('');
 });
 
-if (STYLES) {
+if (STYLES && !ENDLESS_ONLY) {
   var matchups = [
     ['normal', 'bold', 'meek'],
     ['normal', 'hoard', 'tycoon'],
@@ -266,4 +288,172 @@ if (STYLES) {
     });
     console.log('');
   });
+}
+
+/* ---------- v10: โหมดไม่จำกัดรอบ + บอส ---------- */
+function stats(list) {
+  if (!list.length) return { n: 0, mean: 0, med: 0, p90: 0, max: 0 };
+  var a = list.slice().sort(function (x, y) {
+    return x - y;
+  });
+  var sum = 0;
+  a.forEach(function (x) {
+    sum += x;
+  });
+  function q(f) {
+    return a[Math.min(a.length - 1, Math.floor(f * a.length))];
+  }
+  return { n: a.length, mean: sum / a.length, med: q(0.5), p90: q(0.9), max: a[a.length - 1] };
+}
+
+function fmt(st, d) {
+  d = d == null ? 1 : d;
+  return 'เฉลี่ย ' + st.mean.toFixed(d) + ' · มัธยฐาน ' + st.med + ' · p90 ' + st.p90 + ' · สูงสุด ' + st.max;
+}
+
+function runEndless(map, seats, games, seed0) {
+  var wins = new Array(seats).fill(0);
+  var capped = 0;
+  var lv6 = [];
+  var wait = [];
+  var alive = [];
+  var length = [];
+  var actions = [];
+  var tries = [];
+  var never = 0; // เกมที่ไม่มีใครถึง Lv 6 ก่อนเพดาน
+  var brokeGames = 0;
+  var notRich = 0;
+  var ended = 0;
+  var declines = 0;
+  var fights = {}; // key = กลุ่มเลเวล/อุปกรณ์ → { n, win }
+  var fightN = 0;
+  var fightWin = 0;
+  function bucket(key, won) {
+    var f = fights[key] || (fights[key] = { n: 0, win: 0 });
+    f.n++;
+    if (won) f.win++;
+  }
+  for (var g = 0; g < games; g++) {
+    var defs = [];
+    for (var i = 0; i < seats; i++) defs.push({ name: 'P' + i, cpu: true, style: 'normal' });
+    var s = R.newGame({ players: defs, length: 'endless', map: map, seed: seed0 + g * 7919 });
+    var steps = 0;
+    var cur = null; // การต่อสู้บอสที่กำลังเกิด { lv, gear, items }
+    while (s.phase !== 'over' && s.round <= CAP) {
+      var a = R.cpuAct(s);
+      if (s.phase === 'decide' && s.pending.kind === 'boss' && a.type === 'skip') declines++;
+      if (s.phase === 'decide' && s.pending.kind === 'boss' && a.type === 'fight') {
+        var p = s.players[s.turn];
+        var gt = Math.max(p.w, p.ar) + 1; // ขั้นอุปกรณ์สูงสุดที่มี (0 = ไม่มี)
+        var kit = (p.oil > 0 ? 1 : 0) + (p.buckler > 0 ? 1 : 0) + (p.scroll > 0 ? 1 : 0) + (p.bomb > 0 ? 1 : 0);
+        cur = { lv: Math.min(p.lv, 9), gear: gt <= 0 ? 'ไม่มี' : gt <= 2 ? '1-2' : gt <= 4 ? '3-4' : '5-6', kit: kit >= 2 ? 'ของช่วยรบ≥2' : 'ของช่วยรบ<2' };
+      }
+      var evs = R.act(s, a);
+      if (!evs) throw new Error('คอมเลือกการกระทำที่ใช้ไม่ได้: ' + JSON.stringify(a));
+      steps++;
+      if (cur) {
+        for (var e = 0; e < evs.length; e++) {
+          var k = evs[e].k;
+          if (evs[e].boss && (k === 'win' || k === 'lose' || k === 'draw' || k === 'flee')) {
+            var won = k === 'win';
+            fightN++;
+            if (won) fightWin++;
+            bucket('Lv ' + cur.lv, won);
+            bucket('อุปกรณ์ขั้น ' + cur.gear, won);
+            bucket(cur.kit, won);
+            bucket('Lv ' + (cur.lv <= 5 ? '≤5' : cur.lv <= 7 ? '6-7' : '8+') + ' · ขั้น ' + cur.gear, won);
+            cur = null;
+            break;
+          }
+        }
+      }
+    }
+    var B = s.boss;
+    if (B.lv6) lv6.push(B.lv6);
+    else never++;
+    if (B.out) wait.push(B.out - B.lv6);
+    if (s.phase !== 'over') {
+      capped++;
+      continue;
+    }
+    ended++;
+    wins[s.result.winner]++;
+    alive.push(s.round - B.out);
+    length.push(s.round);
+    actions.push(steps);
+    tries.push(B.tries);
+    // คนปราบบอสมีทรัพย์รวมมากสุดไหม
+    var top = -1;
+    var best = -Infinity;
+    s.players.forEach(function (q, qi) {
+      var t = R.total(s, qi);
+      if (t > best) {
+        best = t;
+        top = qi;
+      }
+    });
+    if (top !== s.result.slayer) notRich++;
+    if (
+      s.players.some(function (q) {
+        return q.st.broke > 0;
+      })
+    )
+      brokeGames++;
+  }
+  return {
+    wins: wins,
+    ended: ended,
+    capped: capped,
+    never: never,
+    lv6: stats(lv6),
+    wait: stats(wait),
+    alive: stats(alive),
+    length: stats(length),
+    actions: stats(actions),
+    tries: stats(tries),
+    notRich: ended ? notRich / ended : 0,
+    broke: ended ? brokeGames / ended : 0,
+    declines: declines / games,
+    fights: fights,
+    fightRate: fightN ? fightWin / fightN : 0,
+    fightN: fightN / games
+  };
+}
+
+if (ENDLESS) {
+  console.log('== โหมดไม่จำกัดรอบ + บอส (' + R.BOSS.name + ' hp ' + R.BOSS.hp + ' atk ' + R.BOSS.atk + ' def ' + R.BOSS.def + ' · ย้ายเมืองทุก ' + R.BOSS_TUNE.move + ' รอบ · คอมยอมสู้เมื่อโอกาส ≥ ' + R.BOSS_TUNE.need + ' · เพดานจำลอง ' + CAP + ' รอบ) ==');
+  MAPS.forEach(function (map, mi) {
+    [2, 3].forEach(function (seats) {
+      var r = runEndless(map, seats, N, 9000 + seats * 100000 + mi * 50000000);
+      console.log(R.MAPS[map].name + ' · ' + seats + ' คน (' + N + ' เกม · จบ ' + r.ended + ' · ชนเพดาน ' + r.capped + ' · ไม่มีใครถึง Lv 6 ' + r.never + ')');
+      console.log('  ถึง Lv 6 คนแรก (รอบ): ' + fmt(r.lv6));
+      console.log('  รอเปิดไพ่จนบอสออก (รอบ): ' + fmt(r.wait));
+      console.log('  บอสออกจนถูกปราบ (รอบ): ' + fmt(r.alive));
+      console.log('  ความยาวเกม (รอบ): ' + fmt(r.length) + ' · การกระทำ: ' + fmt(r.actions, 0));
+      console.log('  สู้บอสกี่ครั้งกว่าจะปราบได้ (รวมทุกคน): ' + fmt(r.tries) + ' · สู้บอส ' + r.fightN.toFixed(1) + ' ครั้ง/เกม ชนะ ' + pct(r.fightRate) + ' · ตกเมืองบอสแล้วไม่สู้ ' + r.declines.toFixed(1) + ' ครั้ง/เกม');
+      console.log(
+        '  ชนะตามที่นั่ง ' +
+          r.wins
+            .map(function (w) {
+              return pct(r.ended ? w / r.ended : 0);
+            })
+            .join(' / ') +
+          ' · คนปราบบอสไม่ใช่คนทรัพย์มากสุด ' +
+          pct(r.notRich) +
+          ' · มีคนหมดตัว ' +
+          pct(r.broke)
+      );
+      var keys = Object.keys(r.fights).sort();
+      console.log(
+        '  ชนะบอสตามคนสู้: ' +
+          keys
+            .map(function (k) {
+              var f = r.fights[k];
+              return k + ' ' + pct(f.win / f.n) + ' (' + f.n + ')';
+            })
+            .join(' · ')
+      );
+    });
+  });
+  console.log('');
 }

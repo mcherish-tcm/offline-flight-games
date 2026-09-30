@@ -10,11 +10,12 @@
  *   ทุกที่ที่อ้าง "เมืองที่ k" (pending.town, battle.town, action.town) = ลำดับใน s.towns ไม่ใช่ลำดับใน TOWNS
  * ทุกการกระทำผ่าน act(s, action) → คืนรายการเหตุการณ์ (events) ให้หน้าจอเอาไปแสดง
  * ใครต้องตัดสินใจตอนนี้ = decider(s) · คอมเลือกให้ = cpuAct(s)
- * เซฟรุ่นเก่า (s.v = 1 · ยังไม่มีแผนที่ / s.v = 2 · ก่อน v9) → migrate(s) แปลงเป็นรุ่นปัจจุบัน
+ * เซฟรุ่นเก่า (s.v = 1 · ยังไม่มีแผนที่ / s.v = 2 · ก่อน v9 / s.v = 3 · ก่อน v10) → migrate(s) แปลงเป็นรุ่นปัจจุบัน
+ * v10: โหมดไม่จำกัดรอบ (s.endless · s.rounds = 0) + บอส (s.boss) — ดูหัวข้อ "โหมดไม่จำกัดรอบ + บอส" ในตัวเลขหลัก
  *
  * ช่วง (s.phase):
  *   'roll'   — รอทอยเต๋า (ใช้ยา/รองเท้าก่อนทอยได้)
- *   'decide' — รอเลือก: s.pending.kind = 'duel-offer' | 'town' | 'visit' (เมืองคนอื่น: พัก/ปล้น) | 'invest' | 'shop'
+ *   'decide' — รอเลือก: s.pending.kind = 'duel-offer' | 'town' | 'visit' (เมืองคนอื่น: พัก/ปล้น) | 'invest' | 'shop' | 'boss' (เมืองที่บอสยึด: สู้/ไม่สู้)
  *   'battle' — กำลังสู้มอนสเตอร์/ผู้เฝ้าเมือง (s.battle) เลือกท่าทีละยก
  *   'duel'   — ประลองระหว่างผู้เล่น (s.duel) ต่างคนต่างวางแผน 3 ท่าลับ ๆ
  *   'over'   — จบเกม (s.result)
@@ -26,10 +27,12 @@
 })(typeof self !== 'undefined' ? self : this, function () {
   'use strict';
 
-  var VERSION = 3; // รุ่นของสถานะที่บันทึก (1 = ก่อนมีแผนที่/ไพ่/เครื่องราง · 2 = ก่อนมีพัก/ปล้นเมือง + ของช่วยรบ)
+  var VERSION = 4; // รุ่นของสถานะที่บันทึก (1 = ก่อนมีแผนที่/ไพ่/เครื่องราง · 2 = ก่อนมีพัก/ปล้นเมือง + ของช่วยรบ · 3 = ก่อนมีโหมดไม่จำกัดรอบ + บอส)
 
   /* ---------- ตัวเลขหลัก (ปรับสมดุลตรงนี้ · ผลจำลองอยู่ใน tests/realm-sim.js) ---------- */
   var LENGTHS = { short: 15, mid: 22, long: 30 }; // จำนวนรอบ (ทุกคนเล่นคนละ 1 ตา = 1 รอบ)
+  var ENDLESS = 'endless'; // v10: โหมดไม่จำกัดรอบ — จบเมื่อมีคนปราบบอสได้ (s.endless = true · s.rounds = 0)
+  var LENGTH_IDS = ['short', 'mid', 'long', ENDLESS]; // ตัวเลือกความยาวตอนเริ่มเกม
   var START_GOLD = 150;
   var SEAT_BONUS = 45; // ที่นั่งหลังได้ทุนเพิ่มที่นั่งละ 45 (ชดเชยเดินทีหลัง · ผลจำลอง 3,000 เกมต่อชุด ทั้ง 2 แผนที่)
   var SALARY = 50; // ผ่านลานประตูเมือง
@@ -68,6 +71,27 @@
   var SEAL_RATE = 0.5; // เครื่องรางตราผ่านแดน: จ่ายค่าผ่านทางแค่ครึ่งเดียว
   var PURSE_BONUS = 30; // เครื่องรางเหรียญมังกร: เงินหลวงเพิ่ม
   var TOME_MULT = 1.5; // เครื่องรางตำราปราชญ์: ค่าประสบการณ์ ×1.5
+
+  /* ---------- โหมดไม่จำกัดรอบ + บอส (v10) ----------
+   * ไม่มีจำนวนรอบ · มีคนแรกถึง Lv BOSS_LV → ใส่ "การ์ดอัญเชิญบอส" ลงกองไพ่ และไพ่ใบถัดไปที่ใครเปิด = ใบนี้แน่นอน
+   * เปิดแล้ว บอสไปยึดเมืองที่มีเจ้าของ (สุ่ม · ไม่มีเมืองไหนมีเจ้าของ = สุ่มจากทุกเมือง) แล้วย้ายเมืองแบบสุ่มทุก 1 รอบ
+   * ตกเมืองที่บอสอยู่ (รวมเจ้าเมืองเอง) = เลือกสู้บอสหรือไม่สู้ · เมืองนั้นไม่มีค่าผ่านทาง ปล้นไม่ได้ ขยายไม่ได้ ระหว่างบอสอยู่
+   * ปราบบอสได้ = ชนะ จบเกมทันที (คนปราบอันดับ 1 · ที่เหลือเรียงตามทรัพย์รวมเหมือนจบปกติ)
+   * บอสฟื้นเต็มทุกครั้งที่สู้ใหม่ · แพ้บอส = โทษแพ้ปกติ (เหรียญหล่น 15% + พักฟื้น 1 ตา)
+   * s.boss = { stage: 'wait'|'deck'|'out'|'dead', town, left (ตาที่เหลือก่อนย้ายเมือง), lv6, called, out, tries, slayer } */
+  var ENDLESS_REF = 30; // โหมดไม่จำกัด: ความคืบหน้าเกม (แทน รอบ/จำนวนรอบ) = min(รอบ/30, 1) — ใช้กับรางวัล/มอนสเตอร์ที่โตตามเกม
+  var BOSS_LV = 6;
+  // ค่าพลังบอส (ปรับจากผลจำลองใน tests/realm-sim.js --boss) · bias = โอกาสเลือก [โจมตี, แรง, ป้องกัน]
+  var BOSS = { id: 'boss', name: 'ราชันอสูรเงาคราม', hp: 200, atk: 32, def: 12, tier: 6, bias: [0.3, 0.45, 0.25] };
+  // move = บอสย้ายเมืองทุกกี่รอบ · need = คอมนิสัยปกติยอมสู้บอสเมื่อโอกาสชนะ (จำลอง) ถึงเท่านี้
+  var BOSS_TUNE = { move: 1, need: 0.25 };
+  var BOSS_CARD = {
+    id: 'summon',
+    boss: true,
+    good: false,
+    name: 'การ์ดอัญเชิญบอส',
+    text: BOSS.name + 'ตื่นขึ้นแล้ว! บุกยึดเมืองที่มีเจ้าของ 1 เมือง แล้วย้ายเมืองทุกรอบ · ใครปราบได้ = ชนะทันที'
+  };
 
   /* ---------- ท่าต่อสู้ ----------
    * ตารางวน (เหมือนเป่ายิ้งฉุบ): โจมตีแรง ชนะ ป้องกัน · ป้องกัน ชนะ โจมตี (สวนกลับ) · โจมตี ชนะ โจมตีแรง (ตัดหน้า)
@@ -291,6 +315,12 @@
     return TOWNS[s.towns[k].i];
   }
 
+  // ความคืบหน้าของเกม 0..1 (ใช้ขยายรางวัล/มอนสเตอร์ช่วงท้ายเกม) · โหมดไม่จำกัดรอบ = min(รอบ/30, 1) ไม่หารด้วย 0
+  function progress(s) {
+    if (s.endless || !(s.rounds > 0)) return Math.min(1, s.round / ENDLESS_REF);
+    return s.round / s.rounds;
+  }
+
   /* ---------- ผู้เล่น ---------- */
   function makePlayer(def, i) {
     return {
@@ -427,13 +457,16 @@
   function newGame(opts) {
     opts = opts || {};
     var defs = opts.players && opts.players.length ? opts.players : [{ name: 'คุณ' }, { name: 'คอม', cpu: true }];
-    var rounds = opts.rounds || LENGTHS[opts.length] || LENGTHS.mid;
+    var endless = opts.length === ENDLESS;
+    var rounds = endless ? 0 : opts.rounds || LENGTHS[opts.length] || LENGTHS.mid;
     var M = MAPS[opts.map] || MAPS.classic;
     var s = {
       v: VERSION,
       seed: (opts.seed == null ? Math.floor(Math.random() * 4294967296) : opts.seed) >>> 0,
       map: M.id,
-      rounds: rounds,
+      rounds: rounds, // 0 = ไม่จำกัดรอบ (s.endless)
+      endless: endless,
+      boss: endless ? { stage: 'wait', town: -1, left: 0, lv6: 0, called: 0, out: 0, tries: 0, slayer: -1 } : null,
       length: opts.length || null,
       round: 1,
       turn: 0,
@@ -464,8 +497,8 @@
    * คืนสถานะที่ใช้ได้ (แก้ในตัว) หรือ null ถ้าเสียหาย/ไม่รู้จัก */
   function migrate(s) {
     if (!s || typeof s !== 'object' || !Array.isArray(s.players) || !Array.isArray(s.board) || !Array.isArray(s.towns)) return null;
-    if (s.v === VERSION) return MAPS[s.map] ? s : null;
-    if (s.v !== 1 && s.v !== 2) return null;
+    if (s.v === VERSION) return MAPS[s.map] && (!s.endless || (s.boss && typeof s.boss === 'object')) ? s : null;
+    if (s.v !== 1 && s.v !== 2 && s.v !== 3) return null;
     if (s.v === 1) {
       var M = MAPS.legacy;
       if (s.board.length !== M.layout.length || s.towns.length !== M.towns.length) return null;
@@ -485,16 +518,23 @@
     }
     // รุ่น 2 → 3: ของช่วยรบ 3 ชนิด + สถิติปล้นเมือง (อาวุธ/เกราะขั้นเดิมอยู่ลำดับเดิม ขั้นใหม่ต่อท้าย)
     if (!MAPS[s.map]) return null;
-    s.players.forEach(function (p) {
-      FIGHT_ITEMS.forEach(function (k) {
-        if (p[k] == null) p[k] = 0;
+    if (s.v <= 2) {
+      s.players.forEach(function (p) {
+        FIGHT_ITEMS.forEach(function (k) {
+          if (p[k] == null) p[k] = 0;
+        });
+        if (!p.st) p.st = newStats();
+        ROB_STATS.forEach(function (k) {
+          if (p.st[k] == null) p.st[k] = 0;
+        });
       });
-      if (!p.st) p.st = newStats();
-      ROB_STATS.forEach(function (k) {
-        if (p.st[k] == null) p.st[k] = 0;
-      });
-    });
-    if (s.duel && !s.duel.items) s.duel.items = [[], []];
+      if (s.duel && !s.duel.items) s.duel.items = [[], []];
+      s.v = 3;
+    }
+    // รุ่น 3 → 4 (v10): ยังไม่มีโหมดไม่จำกัดรอบ → เซฟเก่าทุกอันเป็นเกมจำนวนรอบคงที่ เล่นต่อจนจบแบบเดิม
+    if (!(s.rounds > 0)) return null;
+    s.endless = false;
+    s.boss = null;
     s.v = VERSION;
     return s;
   }
@@ -532,6 +572,78 @@
       ev(out, 'level', p.name + ' เลเวลอัปเป็น Lv ' + p.lv + '! (พลังชีวิต +' + LEVEL_UP.hp + ' · โจมตี +' + LEVEL_UP.atk + ' · ป้องกัน +' + LEVEL_UP.def + ')', { p: pi });
     }
     if (p.lv >= MAX_LEVEL) p.xp = 0;
+    if (p.lv >= BOSS_LV) callBoss(s, pi, out);
+  }
+
+  /* ---------- บอส (โหมดไม่จำกัดรอบ · v10) ---------- */
+  // มีคนแรกถึง Lv 6 → ใส่การ์ดอัญเชิญบอสลงกองไพ่ (ไพ่ใบถัดไปที่ใครเปิด = ใบนี้แน่นอน)
+  function callBoss(s, pi, out) {
+    var B = s.boss;
+    if (!s.endless || !B || B.stage !== 'wait') return;
+    B.stage = 'deck';
+    B.lv6 = s.round;
+    ev(out, 'boss-card', s.players[pi].name + ' ถึง Lv ' + BOSS_LV + ' เป็นคนแรก — "' + BOSS_CARD.name + '" ถูกใส่ลงกองไพ่แล้ว! ใครเปิดไพ่ที่ศาลาเสี่ยงทายใบถัดไป = อัญเชิญ' + BOSS.name, { p: pi });
+  }
+
+  function bossHere(s, k) {
+    return !!(s.boss && s.boss.stage === 'out' && s.boss.town === k);
+  }
+
+  // เมืองที่บอสไปอยู่ได้: เมืองที่มีเจ้าของ (ไม่มีเลย = ทุกเมือง) ยกเว้นเมือง except
+  function bossSpots(s, except) {
+    var own = [];
+    var all = [];
+    s.towns.forEach(function (t, k) {
+      if (k === except) return;
+      all.push(k);
+      if (t.owner >= 0) own.push(k);
+    });
+    if (own.length) return own;
+    // มีเมืองที่มีเจ้าของแค่เมืองที่บอสยืนอยู่ = อยู่ที่เดิม
+    if (except >= 0 && s.towns[except] && s.towns[except].owner >= 0) return [];
+    return all;
+  }
+
+  function summonBoss(s, pi, out) {
+    var B = s.boss;
+    var list = bossSpots(s, -1);
+    var k = list[rint(s, 0, list.length - 1)];
+    B.stage = 'out';
+    B.town = k;
+    // ย้ายเมืองเมื่อครบ 1 รอบ · ครั้งแรก +1 ตา (นับตาของคนเปิดไพ่ที่กำลังจบ) = ทุกคนรวมคนเปิดไพ่ได้เล่น 1 ตาก่อนบอสย้าย
+    B.left = Math.max(1, Math.round(s.players.length * BOSS_TUNE.move)) + 1;
+    B.called = s.round;
+    B.out = s.round;
+    var t = s.towns[k];
+    ev(
+      out,
+      'boss',
+      BOSS.name + 'ปรากฏตัว บุกยึด' + TOWNS[t.i].name + (t.owner >= 0 ? ' (เมืองของ ' + s.players[t.owner].name + ')' : '') + '! ใครหยุดที่เมืองนี้ได้ท้าสู้ · ปราบได้ = ชนะทันที',
+      { p: pi, town: k, owner: t.owner }
+    );
+  }
+
+  // จบแต่ละตา: บอสนับถอยหลัง ครบ 1 รอบ = ย้ายไปเมืองอื่นแบบสุ่ม (เมืองที่มีเจ้าของ)
+  function bossTick(s, out) {
+    var B = s.boss;
+    if (!B || B.stage !== 'out') return;
+    B.left -= 1;
+    if (B.left > 0) return;
+    B.left = Math.max(1, Math.round(s.players.length * BOSS_TUNE.move));
+    var list = bossSpots(s, B.town);
+    if (!list.length) return;
+    var from = B.town;
+    B.town = list[rint(s, 0, list.length - 1)];
+    var t = s.towns[B.town];
+    ev(out, 'boss-move', BOSS.name + 'ย้ายจาก' + TOWNS[s.towns[from].i].name + 'ไปยึด' + TOWNS[t.i].name + (t.owner >= 0 ? ' (เมืองของ ' + s.players[t.owner].name + ')' : ''), {
+      p: -1,
+      town: B.town,
+      from: from
+    });
+  }
+
+  function bossFoe() {
+    return { m: BOSS.id, name: BOSS.name, hp: BOSS.hp, atk: BOSS.atk, def: BOSS.def, tier: BOSS.tier, bias: BOSS.bias.slice(), level: 0, boss: true };
   }
 
   function pay(s, from, to, amount, out) {
@@ -552,9 +664,33 @@
     var p = s.players[pi];
     var list = [];
     s.towns.forEach(function (t, k) {
-      if (t.owner === pi && t.level < MAX_TOWN_LEVEL && investCost(t) <= p.gold) list.push(k);
+      // เมืองที่บอสยึดอยู่ขยายไม่ได้ (v10)
+      if (t.owner === pi && t.level < MAX_TOWN_LEVEL && investCost(t) <= p.gold && !bossHere(s, k)) list.push(k);
     });
     return list;
+  }
+
+  // v10: ทำไมผ่านลานประตูเมืองแล้วขยายเมืองไม่ได้ (มีเมืองแต่ขยายไม่ได้สักเมือง) — แค่ข้อความ ไม่เปลี่ยนกติกา
+  function noInvestReason(s, pi) {
+    var p = s.players[pi];
+    var mine = [];
+    s.towns.forEach(function (t, k) {
+      if (t.owner === pi) mine.push(k);
+    });
+    if (!mine.length) return '';
+    var open = mine.filter(function (k) {
+      return s.towns[k].level < MAX_TOWN_LEVEL;
+    });
+    if (!open.length) return 'เมืองของตัวเองเต็มระดับ ' + MAX_TOWN_LEVEL + ' ครบทุกเมืองแล้ว';
+    var free = open.filter(function (k) {
+      return !bossHere(s, k);
+    });
+    if (!free.length) return 'เมืองที่ยังขยายได้ถูก' + BOSS.name + 'ยึดอยู่';
+    var cheap = Infinity;
+    free.forEach(function (k) {
+      cheap = Math.min(cheap, investCost(s.towns[k]));
+    });
+    return 'ขยายเมืองถูกสุดต้องมี ' + cheap + ' เหรียญ (ตอนนี้มี ' + p.gold + ')';
   }
 
   function endTurn(s, out) {
@@ -573,6 +709,8 @@
         ev(out, 'ask', cur.name + ' ผ่านลานประตูเมือง — ลงทุนขยายเมืองของตัวเองได้ 1 เมือง', { p: s.turn });
         return;
       }
+      var why = noInvestReason(s, s.turn);
+      if (why) ev(out, 'noinvest', cur.name + ' ผ่านลานประตูเมือง แต่ยังขยายเมืองไม่ได้ — ' + why, { p: s.turn });
     }
     // ไปคนถัดไป · คนที่แพ้การต่อสู้ในตาก่อน = นอนพักฟื้น ข้าม 1 ตา (แล้วฟื้นเต็ม)
     for (var guard = 0; guard <= s.players.length; guard++) {
@@ -585,7 +723,9 @@
         s.fest -= 1;
         if (s.fest === 0) ev(out, 'fest', 'เทศกาลโคมลอยจบแล้ว — ค่าผ่านทางกลับเป็นปกติ', { p: -1 });
       }
-      if (s.round > s.rounds) {
+      bossTick(s, out);
+      // โหมดไม่จำกัดรอบ: ไม่จบตามจำนวนรอบ (จบเมื่อมีคนปราบบอสเท่านั้น)
+      if (!s.endless && s.round > s.rounds) {
         finish(s, out);
         return;
       }
@@ -612,11 +752,22 @@
       });
   }
 
-  function finish(s, out) {
+  // slayer = ผู้เล่นที่ปราบบอส (โหมดไม่จำกัดรอบ) → อันดับ 1 เสมอ ที่เหลือเรียงตามทรัพย์รวมเหมือนจบปกติ
+  function finish(s, out, slayer) {
     s.phase = 'over';
-    s.round = s.rounds;
+    if (!s.endless) s.round = s.rounds;
     s.fest = 0;
     var rank = standings(s);
+    if (slayer >= 0) {
+      var at = 0;
+      for (var i = 0; i < rank.length; i++) if (rank[i].p === slayer) at = i;
+      var first = rank.splice(at, 1)[0];
+      first.slayer = true;
+      rank.unshift(first);
+      s.result = { rank: rank, winner: slayer, slayer: slayer };
+      ev(out, 'over', 'จบเกม — ' + s.players[slayer].name + ' ปราบ' + BOSS.name + 'ได้ ชนะ!', { p: slayer, slayer: slayer });
+      return;
+    }
     var tie = rank.length > 1 && rank[0].total === rank[1].total && rank[0].count === rank[1].count;
     s.result = { rank: rank, winner: tie ? -1 : rank[0].p };
     ev(out, 'over', tie ? 'จบเกม — เสมอกัน!' : 'จบเกม — ' + s.players[rank[0].p].name + ' ชนะ!', { p: s.result.winner });
@@ -704,12 +855,14 @@
     var pi = s.turn;
     var p = s.players[pi];
     var sp = s.board[p.pos];
-    var frac = s.round / s.rounds;
+    var frac = progress(s);
     switch (sp.t) {
       case 'start': {
+        // หยุดพอดีที่ลาน = โบนัสเงินครึ่งหนึ่งของเงินหลวง + (v10) พลังชีวิตเต็ม · เดินผ่านเฉย ๆ ไม่ได้ฟื้นพลัง
         var bonus = Math.round(SALARY / 2);
         p.gold += bonus;
-        ev(out, 'gold', p.name + ' หยุดที่ลานประตูเมือง รับโบนัสอีก ' + bonus + ' เหรียญ', { p: pi, v: bonus });
+        p.hp = p.mhp;
+        ev(out, 'gold', p.name + ' หยุดที่ลานประตูเมือง รับโบนัสอีก ' + bonus + ' เหรียญ และพลังชีวิตเต็ม', { p: pi, v: bonus });
         endTurn(s, out);
         return;
       }
@@ -739,7 +892,12 @@
         var k = sp.town;
         var t = s.towns[k];
         var T = TOWNS[t.i];
-        if (t.owner === -1) {
+        if (bossHere(s, k)) {
+          // v10: บอสยึดเมืองนี้อยู่ = ไม่มีค่าผ่านทาง/ปล้น/ขยาย/ยึด — เลือกสู้บอส หรือไม่สู้ (รวมเจ้าเมืองเอง)
+          s.phase = 'decide';
+          s.pending = { kind: 'boss', town: k };
+          ev(out, 'ask', BOSS.name + 'ยึด' + T.name + 'อยู่ — ' + p.name + ' จะท้าสู้ไหม (ปราบได้ = ชนะทันที)', { p: pi, town: k });
+        } else if (t.owner === -1) {
           s.phase = 'decide';
           s.pending = { kind: 'town', town: k };
           ev(out, 'ask', T.name + ' ถูก' + monsterById(T.guard).name + 'ยึดอยู่ — จะสู้เพื่อยึดเมืองไหม', { p: pi });
@@ -749,7 +907,12 @@
             s.pending = { kind: 'invest', towns: [k], bank: false };
             ev(out, 'ask', p.name + ' กลับถึง' + T.name + ' เมืองของตัวเอง — ลงทุนขยายเมืองได้', { p: pi });
           } else {
-            ev(out, 'home', p.name + ' แวะพักที่' + T.name + ' เมืองของตัวเอง', { p: pi });
+            // v10: บอกเหตุผลที่ขยายไม่ได้ (เต็มระดับ / เงินไม่พอ) — แค่ข้อความ กติกาเดิม
+            var homeWhy =
+              t.level >= MAX_TOWN_LEVEL
+                ? 'เมืองนี้เต็มระดับ ' + MAX_TOWN_LEVEL + ' แล้ว'
+                : 'อยากขยายเป็นระดับ ' + (t.level + 1) + ' ต้องมี ' + investCost(t) + ' เหรียญ (ตอนนี้มี ' + p.gold + ')';
+            ev(out, 'home', p.name + ' แวะพักที่' + T.name + ' เมืองของตัวเอง — ' + homeWhy, { p: pi, town: k, full: t.level >= MAX_TOWN_LEVEL });
             endTurn(s, out);
           }
         } else {
@@ -951,10 +1114,14 @@
   function drawCard(s, out) {
     var pi = s.turn;
     var p = s.players[pi];
-    if (!Array.isArray(s.deck) || !s.deck.length) s.deck = newDeck(s);
-    var c = CARDS[s.deck.pop()] || CARDS[0];
+    var c;
+    if (s.boss && s.boss.stage === 'deck') c = BOSS_CARD; // v10: การ์ดอัญเชิญบอสอยู่ในกอง = ใบนี้แน่นอน (กองเดิมไม่ถูกแตะ)
+    else {
+      if (!Array.isArray(s.deck) || !s.deck.length) s.deck = newDeck(s);
+      c = CARDS[s.deck.pop()] || CARDS[0];
+    }
     p.st.cards = (p.st.cards || 0) + 1;
-    ev(out, 'card', p.name + ' เปิดไพ่ที่ศาลาเสี่ยงทาย: ' + c.name + ' — ' + c.text, { p: pi, card: c.id, good: c.good, name: c.name, text: c.text });
+    ev(out, 'card', p.name + ' เปิดไพ่ที่ศาลาเสี่ยงทาย: ' + c.name + ' — ' + c.text, { p: pi, card: c.id, good: c.good, boss: !!c.boss, name: c.name, text: c.text });
     if (!applyCard(s, pi, c, out)) endTurn(s, out);
   }
 
@@ -965,6 +1132,9 @@
     var n = s.players.length;
     var i;
     switch (c.id) {
+      case 'summon':
+        summonBoss(s, pi, out);
+        return false;
       case 'wind':
         advance(s, pi, 3, out);
         land(s, out);
@@ -973,7 +1143,7 @@
         advance(s, pi, size - p.pos, out, true);
         return false; // จบตา → ได้เลือกลงทุนเมืองเหมือนผ่านลานประตูเมือง
       case 'treasure':
-        gainGold(s, pi, rint(s, 30, 50) + Math.round((s.round / s.rounds) * 30), out, 'ขุดเจอถุงทอง');
+        gainGold(s, pi, rint(s, 30, 50) + Math.round(progress(s) * 30), out, 'ขุดเจอถุงทอง');
         return false;
       case 'festival':
         s.fest = n + 1; // นับรวมตาที่เหลือของรอบถัดไปให้ครบทุกคน (รวมคนจั่วเอง)
@@ -1065,7 +1235,7 @@
   }
 
   function randomMonster(s) {
-    var frac = s.round / s.rounds;
+    var frac = progress(s);
     var top = Math.max(1, Math.min(4, 1 + Math.floor(frac * 3.4)));
     var lo = Math.max(1, top - 1);
     var tier = rint(s, lo, top);
@@ -1129,9 +1299,10 @@
       block: 0, // 1 = โล่ไม้พร้อมกันการโดนตีครั้งถัดไป
       peek: null // ท่าที่อีกฝ่ายจะออกยกถัดไป (ม้วนคัมภีร์อ่านใจ)
     };
+    if (foe.boss) s.battle.boss = true; // v10: สู้บอส (ชนะ = จบเกม · town = เมืองที่บอสยึดอยู่)
     var T = townIdx >= 0 ? townDef(s, townIdx) : null;
-    var head = !T ? 'เจอ ' : up ? 'ขยาย' + T.name + 'เป็นระดับ ' + up + ' ต้องชนะ ' : 'ผู้เฝ้า' + T.name + ': ';
-    ev(out, 'battle', head + foe.name + '!', { p: s.turn, town: townIdx, up: up || 0 });
+    var head = foe.boss ? 'ท้าสู้บอสที่' + T.name + ': ' : !T ? 'เจอ ' : up ? 'ขยาย' + T.name + 'เป็นระดับ ' + up + ' ต้องชนะ ' : 'ผู้เฝ้า' + T.name + ': ';
+    ev(out, 'battle', head + foe.name + '!', { p: s.turn, town: townIdx, up: up || 0, boss: !!foe.boss });
   }
 
   function damage(s, atk, def, mult) {
@@ -1223,7 +1394,7 @@
       return;
     }
     if (b.n >= MAX_EXCHANGES) {
-      ev(out, 'draw', b.name + ' ถอยหนีไป — ไม่มีใครชนะ', { p: pi });
+      ev(out, 'draw', b.boss ? b.name + 'ถอยกลับเข้าเมืองไปตั้งหลัก — ไม่มีใครชนะ (สู้ใหม่ บอสพลังชีวิตเต็ม)' : b.name + ' ถอยหนีไป — ไม่มีใครชนะ', { p: pi, boss: !!b.boss });
       endTurn(s, out);
     }
   }
@@ -1232,6 +1403,18 @@
     var b = s.battle;
     var pi = s.turn;
     var p = s.players[pi];
+    if (b.boss) {
+      // v10: ปราบบอสได้ = ชนะ จบเกมทันที
+      p.st.bossWin = (p.st.bossWin || 0) + 1;
+      s.boss.stage = 'dead';
+      s.boss.slayer = pi;
+      ev(out, 'win', p.name + ' ปราบ' + b.name + 'ได้!', { p: pi, v: 0, boss: true });
+      s.pending = null;
+      s.battle = null;
+      s.duel = null;
+      finish(s, out, pi);
+      return;
+    }
     p.st.wins += 1;
     var gold = b.tier * 12 + rint(s, 0, 10);
     var xp = b.tier * 6;
@@ -1280,7 +1463,7 @@
       p.hp = 1;
       p.skip = 1;
     }
-    ev(out, 'lose', p.name + ' แพ้' + b.name + ' — ' + (lost ? 'ทำเหรียญหล่น ' + lost : 'ไม่เสียเหรียญ') + (feather ? ' · ขนนกกระเรียนช่วยไว้ ไม่ต้องพักฟื้น' : ' · ต้องนอนพักฟื้น 1 ตา'), { p: pi, v: lost });
+    ev(out, 'lose', p.name + ' แพ้' + b.name + ' — ' + (lost ? 'ทำเหรียญหล่น ' + lost : 'ไม่เสียเหรียญ') + (feather ? ' · ขนนกกระเรียนช่วยไว้ ไม่ต้องพักฟื้น' : ' · ต้องนอนพักฟื้น 1 ตา'), { p: pi, v: lost, boss: !!b.boss });
     endTurn(s, out);
   }
 
@@ -1436,6 +1619,7 @@
    * { type: 'use', item: 'smoke'|'bomb' }     ช่วง battle
    * { type: 'duel', target } | { type: 'skip' }  duel-offer
    * { type: 'fight' } | { type: 'skip' }         town (ยังไม่มีเจ้าของ)
+   * { type: 'fight' } | { type: 'skip' }         boss (v10 เมืองที่บอสยึดอยู่ · ไม่สู้ก็ได้)
    * { type: 'invest', town, levels }             invest (0 = ไม่ลงทุน · ≥1 = สู้หัวหน้าผู้เฝ้าเพื่อขยาย 1 ระดับ · town = ลำดับใน s.towns)
    * { type: 'rest' } | { type: 'rob' }           visit (เมืองคนอื่น · ไม่มี skip)
    * { type: 'buy', item } | { type: 'leave' }    shop
@@ -1478,6 +1662,18 @@
           if (a.type === 'fight') startBattle(s, out, guardFoe(s, s.pending.town, 1), s.pending.town);
           else if (a.type === 'skip') {
             ev(out, 'pass', p.name + ' ผ่านเมืองไปก่อน', { p: pi });
+            endTurn(s, out);
+          } else return null;
+          return out;
+        }
+        if (k === 'boss') {
+          // v10: ท้าสู้บอส (ไม่สู้ก็ได้ — ไม่มีอะไรเกิดขึ้น จบตา)
+          if (a.type === 'fight') {
+            s.boss.tries += 1;
+            p.st.bossTry = (p.st.bossTry || 0) + 1;
+            startBattle(s, out, bossFoe(), s.pending.town);
+          } else if (a.type === 'skip') {
+            ev(out, 'pass', p.name + ' ไม่สู้บอส ผ่านไปก่อน', { p: pi });
             endTurn(s, out);
           } else return null;
           return out;
@@ -1553,7 +1749,7 @@
         if (a.type === 'use' && a.item === 'smoke') {
           if (p.smoke <= 0) return null;
           p.smoke -= 1;
-          ev(out, 'flee', p.name + ' ปาลูกควัน หนีออกมาได้', { p: pi });
+          ev(out, 'flee', p.name + ' ปาลูกควัน หนีออกมาได้', { p: pi, boss: !!b.boss });
           endTurn(s, out);
           return out;
         }
@@ -1610,7 +1806,7 @@
     var cushion = bold ? 0 : Math.max(info.fee, 30);
     if (info.lose + cushion > p.gold && info.fee <= p.gold) return { type: 'rest' };
     var robEV = pw * gain - (1 - pw) * loss;
-    var left = Math.max(0, 1 - s.round / s.rounds);
+    var left = s.endless ? 1 : Math.max(0, 1 - progress(s)); // โหมดไม่จำกัด: พลังชีวิตมีค่าตลอด
     var missing = p.mhp - p.hp;
     var hpVal = style === 'hoard' ? 0 : missing * HP_GOLD * Math.min(1, left * 2.5) * (p.hp < p.mhp * 0.5 ? 1.3 : 1);
     var restEV = -Math.min(p.gold, info.fee) + hpVal;
@@ -1669,7 +1865,7 @@
     if (style.indexOf('c-') === 0) {
       for (var i = 0; i < CHARMS.length; i++) if ('c-' + CHARMS[i].id === style) return i;
     }
-    var frac = s.round / s.rounds;
+    var frac = progress(s);
     var others = 0;
     s.towns.forEach(function (t) {
       if (t.owner >= 0 && t.owner !== pi) others++;
@@ -1740,11 +1936,12 @@
         }
         if (k === 'visit') return cpuVisit(s, di);
         if (k === 'shop') return cpuShop(s, di);
+        if (k === 'boss') return cpuBoss(s, di);
         return null;
       }
       case 'battle': {
         var b = s.battle;
-        if (p.bomb > 0 && b.hp <= BOMB_DMG) return { type: 'use', item: 'bomb' };
+        if (p.bomb > 0 && (b.hp <= BOMB_DMG || b.boss)) return { type: 'use', item: 'bomb' }; // บอส: ระเบิดทุกลูก (แรงฟรี ไม่โดนสวน)
         if (p.hp <= p.mhp * 0.3) {
           if (p.potion > 0) return { type: 'use', item: 'potion' };
           if (p.bomb > 0 && b.hp <= BOMB_DMG * 2) return { type: 'use', item: 'bomb' };
@@ -1773,6 +1970,31 @@
     return null;
   }
 
+  /* คอมประเมินโอกาสชนะบอส: จำลองการต่อสู้จริงด้วยตรรกะคอมตัวเดียวกันบนสำเนาสถานะ BOSS_SIMS ครั้ง
+   * (seed ของสำเนาคิดจาก seed เกม — ไม่แตะ s.seed ของเกมจริง ผลจึงยังเล่นซ้ำได้เหมือนเดิม) · ใช้พลังชีวิต/ของในกระเป๋าตอนนี้ */
+  var BOSS_SIMS = 24;
+  function bossOdds(s, pi) {
+    if (!s.pending || s.pending.kind !== 'boss' || s.turn !== pi) return 0;
+    var base = JSON.stringify(s);
+    var wins = 0;
+    for (var i = 0; i < BOSS_SIMS; i++) {
+      var c = JSON.parse(base);
+      c.seed = (s.seed ^ Math.imul(i + 1, 0x9e3779b1)) >>> 0;
+      act(c, { type: 'fight' });
+      for (var g = 0; g < 80 && c.phase === 'battle'; g++) act(c, cpuAct(c));
+      if (c.phase === 'over' && c.result && c.result.slayer === pi) wins++;
+    }
+    return wins / BOSS_SIMS;
+  }
+
+  // คอมเลือกสู้บอส: ชนะ = ชนะทั้งเกม · แพ้ = โทษแพ้ปกติ → ยอมเสี่ยงเมื่อโอกาสถึงเกณฑ์ตามนิสัย
+  // BOSS_TUNE.need = เกณฑ์โอกาสชนะที่คอมนิสัยปกติยอมสู้บอส (อยู่ใน BOSS_TUNE ให้ผลจำลองลองค่าอื่นได้)
+  function cpuBoss(s, di) {
+    var style = s.players[di].style;
+    var need = style === 'always' ? 0.05 : style === 'bold' || style === 'brute' ? 0.15 : style === 'meek' ? 0.4 : BOSS_TUNE.need;
+    return bossOdds(s, di) >= need ? { type: 'fight' } : { type: 'skip' };
+  }
+
   // ร้านค้าของคอม: ยา → อาวุธ/เกราะ (ถูกกว่าก่อน · ไม่ซื้อตอนท้ายเกม) → เครื่องราง → ของใช้อื่น
   // นิสัยในผลจำลอง: 'hoard' ไม่ซื้ออุปกรณ์ · 'geared' ทุ่มซื้ออุปกรณ์ทุกครั้งที่มีเงิน · 'nogear' ซื้อแค่ของใช้
   function cpuShop(s, di) {
@@ -1780,7 +2002,7 @@
     var style = p.style;
     var list = shopList(p);
     var keep = reserve(s, di);
-    var frac = s.round / s.rounds;
+    var frac = progress(s);
     function get(id) {
       for (var i = 0; i < list.length; i++) if (list[i].id === id && list[i].ok) return list[i];
       return null;
@@ -1791,27 +2013,34 @@
     }
     var a = p.potion < 2 ? buyIf('potion', keep * 0.5) : null;
     if (a) return a;
+    // v10 โหมดไม่จำกัดรอบ: บอสใกล้มา/ออกแล้ว (มีคนถึง Lv 5 ขึ้นไป) = ล่าบอส → เตรียมของช่วยรบ + ระเบิดก่อน แล้วทุ่มอุปกรณ์มากขึ้น
+    var hunt = !!s.endless && (s.boss && s.boss.stage !== 'wait' ? true : p.lv >= BOSS_LV - 1);
+    if (hunt && style !== 'hoard') {
+      var kit = ['oil', 'scroll', 'buckler', 'bomb'];
+      for (var ki = 0; ki < kit.length; ki++) if (!(p[kit[ki]] > 0) && (a = buyIf(kit[ki], keep * 0.5))) return a;
+    }
     if (style === 'hoard') return { type: 'leave' };
     // นิสัยในผลจำลอง 'c-<id>': ซื้อเครื่องรางชิ้นนั้นก่อนอย่างอื่น (วัดว่าเครื่องรางชิ้นไหนแรงเกินไหม)
     if (style.indexOf('c-') === 0 && p.ch < 0 && (a = buyIf('ch' + pickCharm(s, di), keep * 0.5))) return a;
     if (style !== 'nogear') {
       var geared = style === 'geared';
-      if (geared || frac < 0.55) {
+      // โหมดไม่จำกัดรอบ: ไม่มี "ท้ายเกม" ให้หยุดซื้ออุปกรณ์ (ต้องแกร่งพอสู้บอส)
+      if (geared || frac < 0.55 || s.endless) {
         var gear = [get('w'), get('ar')].filter(Boolean).sort(function (x, y) {
           return x.price - y.price;
         });
         for (var g = 0; g < gear.length; g++) {
-          if (p.gold - gear[g].price >= (geared ? keep * 0.5 : keep + 40)) return { type: 'buy', item: gear[g].id };
+          if (p.gold - gear[g].price >= (geared || hunt ? keep * 0.5 : keep + 40)) return { type: 'buy', item: gear[g].id };
         }
       }
-      if (p.ch < 0 && (geared || frac < 0.6)) {
+      if (p.ch < 0 && (geared || frac < 0.6 || s.endless)) {
         a = buyIf('ch' + pickCharm(s, di), keep + 30);
         if (a) return a;
       }
     }
     if (p.bomb < 1 && (a = buyIf('bomb', keep + 20))) return a;
-    // ของช่วยรบ (v9): แต่ละนิสัยชอบคนละชิ้น · ช่วงท้ายเกมไม่ซื้อ (สู้น้อยลงแล้ว)
-    if (frac < 0.8) {
+    // ของช่วยรบ (v9): แต่ละนิสัยชอบคนละชิ้น · ช่วงท้ายเกมไม่ซื้อ (สู้น้อยลงแล้ว · โหมดไม่จำกัดรอบซื้อตลอด)
+    if (frac < 0.8 || s.endless) {
       var fav = style === 'brute' || style === 'bold' ? 'oil' : style === 'meek' ? 'buckler' : 'scroll';
       if (!(p[fav] > 0) && (a = buyIf(fav, keep + 30))) return a;
       if (p.buckler < 1 && (a = buyIf('buckler', keep + 70))) return a;
@@ -1837,6 +2066,17 @@
   return {
     VERSION: VERSION,
     LENGTHS: LENGTHS,
+    LENGTH_IDS: LENGTH_IDS,
+    ENDLESS: ENDLESS,
+    ENDLESS_REF: ENDLESS_REF,
+    BOSS: BOSS,
+    BOSS_LV: BOSS_LV,
+    BOSS_CARD: BOSS_CARD,
+    BOSS_TUNE: BOSS_TUNE,
+    progress: progress,
+    bossHere: bossHere,
+    bossFoe: bossFoe,
+    bossOdds: bossOdds,
     SIZE: SIZE,
     MAPS: MAPS,
     MAP_IDS: MAP_IDS,

@@ -11,7 +11,7 @@
   var OPTS = 'realm:opts';
   var STATS = 'realm:stats';
   var SEAT_CLASS = ['c0', 'c1', 'c2'];
-  var LEN_LABEL = { short: 'สั้น', mid: 'กลาง', long: 'ยาว' };
+  var LEN_LABEL = { short: 'สั้น', mid: 'กลาง', long: 'ยาว', endless: 'ไม่จำกัด' };
   var LEN_TIME = { short: '~20 นาที', mid: '~30 นาที', long: '~40 นาที' };
   var MODES = {
     solo1: { label: '1 คน + คอม 1', short: 'คอม 1 ตัว', short2: 'คอม\n1 ตัว', players: [{ name: 'คุณ' }, { name: 'คอมฟ้า', cpu: true }] },
@@ -33,7 +33,7 @@
 
   var opts = FG.store.get(OPTS, null) || {};
   if (!MODES[opts.mode]) opts.mode = 'solo2';
-  if (!R.LENGTHS[opts.length]) opts.length = 'short';
+  if (R.LENGTH_IDS.indexOf(opts.length) === -1) opts.length = 'short';
   if (R.MAP_IDS.indexOf(opts.map) === -1) opts.map = 'classic';
 
   // S = { s: สถานะเกมจาก engine, mode, holder: ผู้เล่น (คน) ที่ถือเครื่องอยู่, log: [ข้อความล่าสุด] }
@@ -63,7 +63,9 @@
     heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
     sword: '<path d="M14.5 4H20v5.5L9 20.5 3.5 15z"/><path d="M5 13l6 6M3 21l2.5-2.5"/>',
     shield: '<path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/>',
-    swords: '<path d="M4 4l9 9M20 4l-9 9M7 15l-3 3 2 2 3-3M17 15l3 3-2 2-3-3"/><path d="M4 4h3v3M20 4h-3v3"/>'
+    swords: '<path d="M4 4l9 9M20 4l-9 9M7 15l-3 3 2 2 3-3M17 15l3 3-2 2-3-3"/><path d="M4 4h3v3M20 4h-3v3"/>',
+    // v10 โลโก้บอส (ราชันอสูรเงาคราม): มงกุฎเขาแหลม + หน้าอสูร ตาเฉียง เขี้ยว
+    boss: '<path d="M5 9.5L3.5 3.5 8.5 7 12 2.5 15.5 7l5-3.5L19 9.5"/><path d="M5 9.5h14V13a7 7 0 0 1-14 0z"/><path d="M8.5 12.2l2.3 1.1M15.5 12.2l-2.3 1.1"/><path d="M9.5 17.2l1.2-1.3 1.3 1.3 1.3-1.3 1.2 1.3"/>'
   };
 
   function svg(name, cls) {
@@ -142,6 +144,16 @@
     return R.BIAS_TEXT[bias.indexOf(mx)];
   }
 
+  // "รอบ 5 / 22" · โหมดไม่จำกัดรอบ = "รอบ 5" (ไม่มีตัวหาร)
+  function roundText(s) {
+    return 'รอบ ' + s.round + (s.endless ? '' : '/' + s.rounds);
+  }
+
+  // ชื่อความยาวของเกมนี้ (ใช้ในบันทึก/ตั้งค่า)
+  function lengthText(s) {
+    return s.endless ? 'ไม่จำกัดรอบ (ล่าบอส)' : s.rounds + ' รอบ';
+  }
+
   function addLog(t) {
     if (!t) return;
     S.log.push(t);
@@ -159,7 +171,7 @@
     FG.store.set(KEY, { s: S.s, mode: S.mode, holder: S.holder, log: S.log });
     var st = FG.store.get(STATS, { played: 0, won: 0 });
     FG.hubNote('realm', {
-      note: S.s.phase === 'over' ? (st.played ? 'ชนะ ' + st.won + '/' + st.played + ' เกม' : '') : 'รอบ ' + S.s.round + '/' + S.s.rounds,
+      note: S.s.phase === 'over' ? (st.played ? 'ชนะ ' + st.won + '/' + st.played + ' เกม' : '') : roundText(S.s),
       resume: S.s.phase !== 'over'
     });
   }
@@ -191,7 +203,8 @@
       return { name: d.name, cpu: !!d.cpu };
     });
     S = { s: R.newGame({ players: defs, length: length, map: map }), mode: mode, holder: mode === 'duo' ? -1 : 0, log: [] };
-    addLog('เริ่มเกม ' + R.MAPS[map].name + ' · ' + LEN_LABEL[length] + ' ' + S.s.rounds + ' รอบ · ' + MODES[mode].label);
+    addLog('เริ่มเกม ' + R.MAPS[map].name + ' · ' + (S.s.endless ? lengthText(S.s) : LEN_LABEL[length] + ' ' + lengthText(S.s)) + ' · ' + MODES[mode].label);
+    if (S.s.endless) addLog('ไม่จำกัดรอบ: ใครถึง Lv ' + R.BOSS_LV + ' คนแรก = การ์ดอัญเชิญบอสลงกองไพ่ · ปราบ' + R.BOSS.name + 'ได้ = ชนะ');
     addLog('ตาของ ' + P(0).name);
     save();
     render();
@@ -246,22 +259,24 @@
       )
     );
     body.appendChild(FG.label('ความยาวเกม'));
-    body.appendChild(
-      rlSeg(
-        FG.choice(
-          ['short', 'mid', 'long'].map(function (k) {
-            return { value: k, label: LEN_LABEL[k] + '\n' + R.LENGTHS[k] + ' รอบ' };
-          }),
-          length,
-          function (v) {
-            length = v;
-          }
-        )
+    var lenSeg = rlSeg(
+      FG.choice(
+        R.LENGTH_IDS.map(function (k) {
+          return { value: k, label: LEN_LABEL[k] + '\n' + (k === R.ENDLESS ? 'ล่าบอส' : R.LENGTHS[k] + ' รอบ') };
+        }),
+        length,
+        function (v) {
+          length = v;
+        }
       )
     );
+    lenSeg.classList.add('rl-seg--4'); // 4 ตัวเลือก: จอแคบแบ่ง 2 แถว (style.css)
+    body.appendChild(lenSeg);
     var note = document.createElement('p');
     note.className = 'rl-note';
-    note.textContent = 'เวลาเล่นโดยประมาณ: สั้น ' + LEN_TIME.short + ' · กลาง ' + LEN_TIME.mid + ' · ยาว ' + LEN_TIME.long + ' · โหมด 2 คน ส่งเครื่องให้กันตอนเปลี่ยนตา';
+    note.textContent =
+      'เวลาเล่นโดยประมาณ: สั้น ' + LEN_TIME.short + ' · กลาง ' + LEN_TIME.mid + ' · ยาว ' + LEN_TIME.long +
+      ' · ไม่จำกัด = เล่นไปเรื่อย ๆ ใครถึง Lv ' + R.BOSS_LV + ' คนแรก บอสจะออกมา ปราบบอสได้ = ชนะ · โหมด 2 คน ส่งเครื่องให้กันตอนเปลี่ยนตา';
     body.appendChild(note);
     var actions = [{ label: 'เริ่มเกม', primary: true, onClick: function () { newGame(mode, length, map); } }];
     if (canCancel) actions.unshift({ label: 'ยกเลิก' });
@@ -380,6 +395,26 @@
       case 'fight-item':
         addLog('  ' + e.t);
         return cpuSide ? 500 : 0;
+      case 'boss-card':
+      case 'boss':
+        // v10: ประกาศใหญ่ให้ทุกคนเห็น (การ์ดบอสลงกอง / บอสปรากฏตัว) แล้วแตะไปต่อ
+        addLog(e.t);
+        view = { kind: 'news', e: e };
+        FG.buzz([40, 60, 40, 60, 80]);
+        return -1;
+      case 'boss-move':
+        addLog(e.t);
+        FG.toast(e.t, 2400);
+        return 800;
+      case 'home':
+      case 'noinvest':
+        // v10: เหตุผลที่ขยายเมืองไม่ได้ — คนเล่นเห็นเป็นแถบแจ้งชัด ๆ
+        addLog(e.t);
+        if (!cpuSide) {
+          FG.toast(e.t, 2800);
+          return 900;
+        }
+        return 650;
       case 'win':
       case 'lose':
       case 'draw':
@@ -522,9 +557,16 @@
       var cls = 'rl-cell t-' + kind;
       var extra = '';
       var label = R.SPACE_NAME[kind];
+      var glyph = kind;
       if (sp.t === 'town') {
         var t = s.towns[sp.town];
         label = R.TOWNS[t.i].name;
+        if (R.bossHere(s, sp.town)) {
+          // v10: เมืองที่บอสยึด = ไอคอนเปลี่ยนเป็นโลโก้บอส
+          cls += ' is-boss';
+          glyph = 'boss';
+          label += ' — ' + R.BOSS.name + 'ยึดอยู่';
+        }
         if (t.owner >= 0) {
           cls += ' is-owned ' + SEAT_CLASS[t.owner];
           var pips = '';
@@ -543,14 +585,17 @@
       });
       el.className = cls;
       el.setAttribute('aria-label', 'ช่อง ' + (i + 1) + ': ' + label);
-      el.innerHTML = svg(kind) + extra + (toks ? '<span class="rl-toks">' + toks + '</span>' : '');
+      el.innerHTML = svg(glyph) + extra + (toks ? '<span class="rl-toks">' + toks + '</span>' : '');
     }
   }
 
   function renderCenter() {
     var s = S.s;
-    roundEl.textContent = s.phase === 'over' ? 'จบเกม' : 'รอบ ' + s.round + ' / ' + s.rounds + (s.fest > 0 ? ' · เทศกาล ×' + R.FEST_MULT : '');
+    var bossOut = s.boss && s.boss.stage === 'out';
+    var bossNote = s.boss && s.phase !== 'over' ? (bossOut ? ' · บอสออกแล้ว' : s.boss.stage === 'deck' ? ' · การ์ดบอสรออยู่' : '') : '';
+    roundEl.textContent = s.phase === 'over' ? 'จบเกม' : 'รอบ ' + s.round + (s.endless ? '' : ' / ' + s.rounds) + (s.fest > 0 ? ' · เทศกาล ×' + R.FEST_MULT : '') + bossNote;
     roundEl.classList.toggle('is-fest', s.phase !== 'over' && s.fest > 0);
+    roundEl.classList.toggle('is-boss', s.phase !== 'over' && !!bossNote && !(s.fest > 0));
     if (!dieEl.textContent) dieEl.textContent = s.lastRoll ? String(s.lastRoll) : '–';
     logEl.innerHTML = S.log
       .slice(-4)
@@ -575,7 +620,12 @@
     actionsEl.innerHTML = '';
     var d = R.decider(s);
     if (s.phase === 'over') {
-      msgEl.textContent = s.result.winner < 0 ? 'จบเกม — เสมอกัน' : 'จบเกม — ' + P(s.result.winner).name + ' ชนะ!';
+      msgEl.textContent =
+        s.result.slayer >= 0
+          ? 'จบเกม — ' + P(s.result.slayer).name + ' ปราบบอส ชนะ!'
+          : s.result.winner < 0
+            ? 'จบเกม — เสมอกัน'
+            : 'จบเกม — ' + P(s.result.winner).name + ' ชนะ!';
       actionsEl.appendChild(btn('ดูผล', function () {
         hideResult = false;
         render();
@@ -646,6 +696,21 @@
         msgEl.textContent = 'แวะ' + townName(s.pending.town) + ' เมืองของ ' + P(s.towns[s.pending.town].owner).name + ' — เลือก พักค้างคืน หรือ ปล้นเมือง';
         return;
       }
+      if (k === 'boss') {
+        // v10: เมืองที่บอสยึด — สู้หรือไม่สู้ (ไม่สู้ = ไม่มีอะไรเกิดขึ้น)
+        var bf = R.bossFoe();
+        // ห่อด้วย span เดียว (.rl-msg เป็น flex — ถ้ามี <b> หลายตัวจะแตกเป็นคอลัมน์)
+        msgEl.innerHTML =
+          '<span><b class="rl-boss-kicker">' + esc(bf.name) + '</b> ยึดเมืองนี้อยู่ · พลังชีวิต ' + bf.hp + ' โจมตี ' + bf.atk + ' ป้องกัน ' + bf.def + ' · ' + habit(bf.bias) +
+          ' · <b>ปราบได้ = ชนะทันที</b> · แพ้ = เหรียญหล่น 15% + พักฟื้น 1 ตา</span>';
+        actionsEl.appendChild(btn('ไม่สู้', function () {
+          act({ type: 'skip' });
+        }));
+        actionsEl.appendChild(btn(svg('boss', 'rl-btn-ico') + 'สู้บอส', function () {
+          act({ type: 'fight' });
+        }, true));
+        return;
+      }
       msgEl.textContent = k === 'shop' ? 'แวะร้านพ่อค้าเร่' : 'ขยายเมือง (ต้องสู้ชนะก่อน)';
       return;
     }
@@ -676,6 +741,7 @@
     if (view && view.kind === 'duel') return duelResult(view.e);
     if (view && view.kind === 'card') return cardView(view.e);
     if (view && view.kind === 'rob') return robResult(view.e);
+    if (view && view.kind === 'news') return newsView(view.e);
     var d = R.decider(s);
     if (s.phase === 'over') {
       if (busy || hideResult) {
@@ -782,11 +848,17 @@
     if (b.oil) fx.push('น้ำมันดาบ: โจมตี +' + b.oil);
     if (b.block) fx.push('โล่ไม้: กันการโดนตีครั้งถัดไป');
     if (b.peek && !endEv) fx.push('อ่านใจ: ' + b.name + 'จะ<b>' + R.MOVE_NAME[b.peek] + '</b> → ออก<b>' + R.MOVE_NAME[R.BEATS[b.peek]] + '</b>ชนะ');
-    var where = b.town < 0 ? 'ป่ามอนสเตอร์' : b.up ? 'ขยาย' + esc(townName(b.town)) + ' → ระดับ ' + b.up : 'ผู้เฝ้า' + esc(townName(b.town));
+    var where = b.boss
+      ? '<span class="rl-boss-kicker">สู้บอส · ปราบได้ = ชนะทันที</span> · ' + esc(townName(b.town))
+      : b.town < 0
+        ? 'ป่ามอนสเตอร์'
+        : b.up
+          ? 'ขยาย' + esc(townName(b.town)) + ' → ระดับ ' + b.up
+          : 'ผู้เฝ้า' + esc(townName(b.town));
     var html =
       '<p class="rl-ov__kicker">' + where + ' · ยกที่ ' + Math.max(1, Math.min(b.n + (endEv ? 0 : 1), R.MAX_EXCHANGES)) + '/' + R.MAX_EXCHANGES + '</p>' +
       '<div class="rl-fight">' +
-      '<div class="rl-fighter"><span class="rl-fighter__name">' + svg('monster', 'rl-fighter__ico') + esc(b.name) + '</span>' + hpBar(b.hp, b.mhp, 'is-foe') +
+      '<div class="rl-fighter' + (b.boss ? ' is-boss' : '') + '"><span class="rl-fighter__name">' + svg(b.boss ? 'boss' : 'monster', 'rl-fighter__ico') + esc(b.name) + '</span>' + hpBar(b.hp, b.mhp, b.boss ? 'is-boss' : 'is-foe') +
       '<span class="rl-fighter__stat num">' + b.hp + '/' + b.mhp + ' · โจมตี ' + b.atk + ' · ป้องกัน ' + b.def + '</span>' +
       '<span class="rl-habit">นิสัย: ' + habit(b.bias) + '</span></div>' +
       '<div class="rl-fighter"><span class="rl-fighter__name">' + dot(pi) + esc(p.name) + ' Lv ' + p.lv + '</span>' + hpBar(p.hp, p.mhp) +
@@ -796,7 +868,7 @@
       (fx.length ? '<p class="rl-fx">' + fx.join(' · ') + '</p>' : '');
     if (endEv) {
       html += '<p class="rl-result is-' + endEv.k + '">' + esc(endEv.t) + '</p><div class="rl-ov__actions"><button type="button" class="btn btn--primary" data-go="1">ไปต่อ</button></div>';
-      showOv(html, 'battle');
+      showOv(html, b.boss ? 'boss' : 'battle');
       ovBox.querySelector('[data-go]').addEventListener('click', closeView);
       return;
     }
@@ -819,7 +891,7 @@
       itemBtn('buckler', R.ITEMS.buckler.short, p.buckler > 0 && !b.block) +
       itemBtn('scroll', R.ITEMS.scroll.short, p.scroll > 0 && !b.peek) +
       '</div>';
-    showOv(html, 'battle');
+    showOv(html, b.boss ? 'boss' : 'battle');
     ovBox.querySelectorAll('[data-m]').forEach(function (el) {
       el.addEventListener('click', function () {
         doBattle({ type: 'move', m: el.getAttribute('data-m') });
@@ -944,14 +1016,31 @@
   function cardView(e) {
     var html =
       '<p class="rl-ov__kicker">' + dot(e.p) + esc(P(e.p).name) + ' · ศาลาเสี่ยงทาย</p>' +
-      '<div class="rl-card ' + (e.good ? 'is-good' : 'is-bad') + '">' +
-      '<span class="rl-card__tag">' + (e.good ? 'ไพ่ดี' : 'ไพ่ร้าย') + '</span>' +
-      svg('card', 'rl-card__ico') +
+      '<div class="rl-card ' + (e.boss ? 'is-boss' : e.good ? 'is-good' : 'is-bad') + '">' +
+      '<span class="rl-card__tag">' + (e.boss ? 'ไพ่บอส' : e.good ? 'ไพ่ดี' : 'ไพ่ร้าย') + '</span>' +
+      svg(e.boss ? 'boss' : 'card', 'rl-card__ico') +
       '<h2 class="rl-card__name">' + esc(e.name) + '</h2>' +
       '<p class="rl-card__text">' + esc(e.text) + '</p>' +
       '</div>' +
       '<div class="rl-ov__actions"><button type="button" class="btn btn--primary" data-go="1">ไปต่อ</button></div>';
     showOv(html, 'card');
+    ovBox.querySelector('[data-go]').addEventListener('click', closeView);
+  }
+
+  // v10 ประกาศบอส: การ์ดอัญเชิญบอสลงกองไพ่ (boss-card) / บอสปรากฏตัวที่เมือง (boss) — ทุกคนเห็น แตะไปต่อ
+  function newsView(e) {
+    var appear = e.k === 'boss';
+    var title = appear ? R.BOSS.name + 'ปรากฏตัว!' : 'การ์ดอัญเชิญบอสลงกองไพ่แล้ว!';
+    var sub = appear
+      ? 'บุกยึด' + townName(e.town) + (e.owner >= 0 ? ' (เมืองของ ' + P(e.owner).name + ')' : '') + ' · ย้ายเมืองทุก 1 รอบ · ใครหยุดที่เมืองนี้ = เลือกสู้ได้ · ปราบได้ = ชนะทันที · เมืองนี้ไม่มีค่าผ่านทาง/ปล้นไม่ได้ระหว่างบอสอยู่'
+      : P(e.p).name + ' ถึง Lv ' + R.BOSS_LV + ' เป็นคนแรก · ใครเปิดไพ่ที่ศาลาเสี่ยงทายใบถัดไป = อัญเชิญบอสแน่นอน · เตรียมอาวุธ เกราะ และของช่วยรบไว้!';
+    var html =
+      '<p class="rl-ov__kicker rl-boss-kicker">โหมดไม่จำกัดรอบ · ' + roundText(S.s) + '</p>' +
+      '<div class="rl-news">' + svg('boss', 'rl-news__ico') +
+      '<h2 class="rl-news__title">' + esc(title) + '</h2>' +
+      '<p class="rl-news__text">' + esc(sub) + '</p></div>' +
+      '<div class="rl-ov__actions"><button type="button" class="btn btn--primary" data-go="1">ไปต่อ</button></div>';
+    showOv(html, 'news');
     ovBox.querySelector('[data-go]').addEventListener('click', closeView);
   }
 
@@ -1047,7 +1136,7 @@
       .map(function (x, k) {
         var p = P(x.p);
         return (
-          '<tr' + (k === 0 && r.winner >= 0 ? ' class="is-first"' : '') + '><th>' + (k + 1) + '</th><td>' + dot(x.p) + esc(p.name) + '</td><td class="num">' + FG.fmtNum(x.gold) + '</td><td class="num">' + FG.fmtNum(x.towns) + ' <small>(' + x.count + ')</small></td><td class="num">' + FG.fmtNum(x.gear || 0) + '</td><td class="num"><b>' + FG.fmtNum(x.total) + '</b></td></tr>'
+          '<tr' + (k === 0 && r.winner >= 0 ? ' class="is-first' + (x.slayer ? ' is-slayer' : '') + '"' : '') + '><th>' + (k + 1) + '</th><td>' + dot(x.p) + esc(p.name) + (x.slayer ? ' <small>ปราบบอส</small>' : '') + '</td><td class="num">' + FG.fmtNum(x.gold) + '</td><td class="num">' + FG.fmtNum(x.towns) + ' <small>(' + x.count + ')</small></td><td class="num">' + FG.fmtNum(x.gear || 0) + '</td><td class="num"><b>' + FG.fmtNum(x.total) + '</b></td></tr>'
         );
       })
       .join('');
@@ -1057,15 +1146,17 @@
         var fromVisits = (st.tollGot || 0) + (st.defGot || 0) - (st.defLost || 0);
         return (
           dot(i) + esc(p.name) + ': Lv ' + p.lv + ' · ชนะมอนสเตอร์ ' + st.wins + ' · แพ้ ' + st.losses + ' · ยึดเมือง ' + st.captured + ' · ขยายเมือง ' + (st.upWin || 0) + '/' + (st.upTry || 0) +
-          ' · เมืองได้จากคนแวะสุทธิ ' + fromVisits + ' · ปล้นสำเร็จ ' + (st.robWin || 0) + '/' + (st.robTry || 0) + ' ครั้ง'
+          ' · เมืองได้จากคนแวะสุทธิ ' + fromVisits + ' · ปล้นสำเร็จ ' + (st.robWin || 0) + '/' + (st.robTry || 0) + ' ครั้ง' +
+          (s.endless ? ' · สู้บอส ' + (st.bossTry || 0) + ' ครั้ง' : '')
         );
       })
       .join('<br>');
+    var slay = r.slayer >= 0;
     var html =
-      '<p class="rl-ov__kicker">จบ ' + s.rounds + ' รอบ</p>' +
-      '<h2 class="rl-ov__title rl-win">' + (r.winner < 0 ? 'เสมอกัน!' : dot(r.winner) + esc(P(r.winner).name) + ' ชนะ!') + '</h2>' +
+      '<p class="rl-ov__kicker' + (slay ? ' rl-boss-kicker' : '') + '">' + (slay ? 'ไม่จำกัดรอบ · ปราบบอสได้ในรอบ ' + s.round : 'จบ ' + s.rounds + ' รอบ') + '</p>' +
+      '<h2 class="rl-ov__title rl-win">' + (slay ? dot(r.slayer) + esc(P(r.slayer).name) + ' ปราบ' + esc(R.BOSS.name) + ' ชนะ!' : r.winner < 0 ? 'เสมอกัน!' : dot(r.winner) + esc(P(r.winner).name) + ' ชนะ!') + '</h2>' +
       '<table class="rl-rank"><thead><tr><th></th><th>ผู้เล่น</th><th>เงิน</th><th>เมือง</th><th>อุปกรณ์ <small>(ครึ่งราคา)</small></th><th>รวม</th></tr></thead><tbody>' + rows + '</tbody></table>' +
-      '<p class="rl-note">คะแนนรวม = เงิน + มูลค่าเมือง + อุปกรณ์ที่ถืออยู่ (อาวุธ เกราะ เครื่องราง) นับครึ่งราคาซื้อ · ของใช้ไม่นับ</p>' +
+      '<p class="rl-note">' + (slay ? 'คนปราบบอส = อันดับ 1 เสมอ · ที่เหลือเรียงตามคะแนนรวม · ' : '') + 'คะแนนรวม = เงิน + มูลค่าเมือง + อุปกรณ์ที่ถืออยู่ (อาวุธ เกราะ เครื่องราง) นับครึ่งราคาซื้อ · ของใช้ไม่นับ</p>' +
       '<p class="rl-note">' + facts + '</p>' +
       '<div class="rl-ov__actions"><button type="button" class="btn" data-see="1">ดูกระดาน</button><button type="button" class="btn btn--primary" data-new="1">เกมใหม่</button></div>';
     showOv(html, 'over');
@@ -1115,7 +1206,7 @@
     var kind = sp.t === 'gold' ? 'chest' : sp.t;
     var title = R.SPACE_NAME[kind];
     var DESC = {
-      start: 'ผ่าน = รับเงินหลวง ' + R.SALARY + ' + 10 ต่อเมืองที่มี (คนทรัพย์น้อยสุดได้เพิ่ม) แล้วขยายเมืองได้ 1 เมือง (ต้องสู้ชนะก่อน) · หยุดพอดี = โบนัสเพิ่ม',
+      start: 'ผ่าน = รับเงินหลวง ' + R.SALARY + ' + 10 ต่อเมืองที่มี (คนทรัพย์น้อยสุดได้เพิ่ม) แล้วขยายเมืองได้ 1 เมือง (ต้องสู้ชนะก่อน) · หยุดพอดี = โบนัสเพิ่ม ' + Math.round(R.SALARY / 2) + ' + พลังชีวิตเต็ม',
       monster: 'เจอมอนสเตอร์สุ่ม ยิ่งท้ายเกมยิ่งเก่ง · ชนะได้เงิน + ค่าประสบการณ์',
       chest: 'ครึ่งหนึ่งได้เงิน 20–60 (ท้ายเกมได้มากขึ้น) · อีกครึ่งได้ของ: ยา · ลูกควัน · ระเบิด · รองเท้า · ยันต์ · น้ำมันดาบ · โล่ไม้ · คัมภีร์อ่านใจ · ยาเสริมแรง · ผลโอ๊กเพิ่มพลังชีวิต',
       card: 'เปิดไพ่เหตุการณ์ 1 ใบ (ไพ่ดี 10 · ไพ่ร้าย 6 ในกอง 16 ใบ) · ไพ่ร้ายเสียไม่เกิน 60 · ยันต์กันเคราะห์กันไพ่ร้ายได้',
@@ -1126,7 +1217,12 @@
       var t = s.towns[sp.town];
       var T = R.TOWNS[t.i];
       title = T.name;
-      if (t.owner < 0) {
+      if (R.bossHere(s, sp.town)) {
+        var bf = R.bossFoe();
+        text =
+          R.BOSS.name + 'ยึดอยู่ (พลังชีวิต ' + bf.hp + ' · โจมตี ' + bf.atk + ' · ป้องกัน ' + bf.def + ' · ' + habit(bf.bias) + ') · หยุดที่นี่ = เลือกสู้บอสได้ ปราบได้ = ชนะทันที · ระหว่างบอสอยู่ ไม่มีค่าผ่านทาง ปล้น/ขยายไม่ได้ · บอสย้ายเมืองทุก 1 รอบ' +
+          (t.owner >= 0 ? ' · เจ้าเมือง: ' + P(t.owner).name + ' ระดับ ' + t.level : '');
+      } else if (t.owner < 0) {
         var m = R.guardFoe(s, sp.town, 1);
         text = 'ยังไม่มีเจ้าของ · ผู้เฝ้า: ' + m.name + ' (พลังชีวิต ' + m.hp + ' · ' + habit(m.bias) + ') · ชนะแล้วจ่ายค่าฟื้นฟู ' + R.claimFee(t.i) + ' · มูลค่า ' + T.base;
       } else {
@@ -1183,7 +1279,7 @@
     if (S && S.s.phase !== 'over') {
       FG.sheet({
         title: 'เริ่มเกมใหม่?',
-        text: 'เกมที่เล่นค้างอยู่ (รอบ ' + S.s.round + '/' + S.s.rounds + ') จะหายไป',
+        text: 'เกมที่เล่นค้างอยู่ (' + roundText(S.s) + ') จะหายไป',
         actions: [{ label: 'เล่นต่อ' }, { label: 'เริ่มใหม่', primary: true, onClick: function () { setTimeout(function () { setupSheet(true); }, 0); } }]
       });
       return;
@@ -1196,7 +1292,7 @@
     FG.settings({
       build: function (body) {
         var now = S
-          ? R.mapOf(S.s).name + ' · ' + MODES[S.mode].label + ' · ' + (S.s.phase === 'over' ? 'จบแล้ว ' + S.s.rounds + ' รอบ' : 'รอบ ' + S.s.round + '/' + S.s.rounds)
+          ? R.mapOf(S.s).name + ' · ' + MODES[S.mode].label + ' · ' + (S.s.phase === 'over' ? 'จบแล้ว ' + (S.s.endless ? S.s.round + ' รอบ (ปราบบอสแล้ว)' : S.s.rounds + ' รอบ') : roundText(S.s) + (S.s.endless ? ' · ไม่จำกัดรอบ' : ''))
           : 'ยังไม่ได้เริ่มเกม';
         body.appendChild(FG.group('เกมนี้', null, now));
         body.appendChild(FG.group('', null, 'แผนที่ · ผู้เล่น · ความยาวเกม เลือกได้ตอนเริ่มเกมใหม่ (ปุ่มลูกศรวงกลมบนแถบหัว)'));
@@ -1220,7 +1316,7 @@
         render();
         FG.sheet({
           title: 'มีเกมค้างอยู่',
-          text: R.mapOf(S.s).name + ' · ' + MODES[S.mode].label + ' · รอบ ' + S.s.round + '/' + S.s.rounds,
+          text: R.mapOf(S.s).name + ' · ' + MODES[S.mode].label + ' · ' + roundText(S.s) + (S.s.endless ? ' · ไม่จำกัดรอบ' : ''),
           actions: [
             { label: 'เริ่มใหม่', onClick: function () { setTimeout(function () { setupSheet(true); }, 0); } },
             { label: 'เล่นต่อ', primary: true, onClick: schedule }
