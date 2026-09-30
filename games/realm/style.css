@@ -1,4 +1,4 @@
-/* Hallmark · extends App Shell (night cabin) · ชิงเมืองแดนมนตร์ — กระดานวน 30 ช่อง (8×9) ตรงกลางเป็นลูกเต๋า + บันทึก
+/* Hallmark · extends App Shell (night cabin) · ชิงเมืองแดนมนตร์ — กระดานวนรอบขอบตาราง --cols×--rows (แดนมนตร์ 8×9 = 30 ช่อง · หมู่เกาะ 6×8 = 24 ช่อง) ตรงกลางเป็นลูกเต๋า + บันทึก
  * ป้ายผู้เล่นด้านบน · แผงปุ่มด้านล่าง (เว้นขอบล่างตาม --fg-safe-bottom ผ่าน body.game) · หน้าต่างเต็มจอสำหรับต่อสู้/ร้าน/ลงทุน/ผล · tokens only */
 :root {
   --rl-c0: var(--color-p1);
@@ -10,6 +10,7 @@
   --rl-chest: var(--color-g1);
   --rl-shop: var(--color-g5);
   --rl-rest: var(--color-g6);
+  --rl-card: var(--color-g9);
   --rl-town: var(--color-ink-2);
   --rl-start: var(--color-accent);
 }
@@ -148,12 +149,14 @@
 
 .rl-board {
   display: grid;
-  grid-template-columns: repeat(8, minmax(0, 1fr));
-  grid-template-rows: repeat(9, minmax(0, 1fr));
+  --cols: 8;
+  --rows: 9;
+  grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+  grid-template-rows: repeat(var(--rows), minmax(0, 1fr));
   gap: 2px;
-  /* ช่องสูงได้มากกว่ากว้าง (ถึง 1.5 เท่า) เพื่อใช้พื้นที่จอแนวตั้งให้เต็ม */
+  /* ช่องสูงได้มากกว่ากว้าง (ถึง 1.5 เท่า) เพื่อใช้พื้นที่จอแนวตั้งให้เต็ม · จำนวนแถว/คอลัมน์มาจากแผนที่ (game.js ตั้ง --cols/--rows) */
   width: min(100cqw, 34rem);
-  height: min(100cqh, min(100cqw, 34rem) * 9 / 8 * 1.5);
+  height: min(100cqh, min(100cqw, 34rem) * var(--rows) / var(--cols) * 1.5);
 }
 
 .rl-cell {
@@ -193,6 +196,11 @@
 
 .rl-cell.t-rest {
   --tc: var(--rl-rest);
+}
+
+.rl-cell.t-card {
+  --tc: var(--rl-card);
+  background: color-mix(in oklch, var(--rl-card) 14%, var(--color-paper-2));
 }
 
 .rl-cell.t-town {
@@ -265,8 +273,8 @@
 
 /* ---------- กลางกระดาน ---------- */
 .rl-center {
-  grid-row: 2 / 9;
-  grid-column: 2 / 8;
+  grid-row: 2 / var(--rows);
+  grid-column: 2 / var(--cols);
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   justify-items: center;
@@ -805,4 +813,88 @@
   .rl-die.is-roll {
     animation: none;
   }
+}
+
+/* ---------- ช่วงเทศกาล (ค่าผ่านทาง ×2) ---------- */
+.rl-round.is-fest {
+  color: var(--rl-card);
+}
+
+/* ---------- ไพ่เหตุการณ์ (ศาลาเสี่ยงทาย) ---------- */
+.rl-card {
+  --cc: var(--color-ok);
+  display: grid;
+  justify-items: center;
+  gap: var(--space-2xs);
+  padding: var(--space-lg) var(--space-md);
+  border: 2px solid var(--cc);
+  border-radius: var(--radius-lg);
+  background: color-mix(in oklch, var(--cc) 12%, var(--color-paper-2));
+  text-align: center;
+  animation: rl-flip var(--dur-slow) var(--ease-out);
+}
+
+.rl-card.is-bad {
+  --cc: var(--color-danger);
+}
+
+.rl-card__tag {
+  padding: 2px var(--space-xs);
+  border-radius: 999px;
+  background: var(--cc);
+  color: var(--color-paper);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.rl-card__ico {
+  width: 44px;
+  height: 44px;
+  color: var(--cc);
+}
+
+.rl-card__name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.rl-card__text {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--color-ink-2);
+}
+
+@keyframes rl-flip {
+  from {
+    transform: rotateY(80deg) scale(0.9);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rl-card {
+    animation: none;
+  }
+}
+
+/* ---------- ร้านค้า: หัวข้อกลุ่ม · ขยายเมือง: ข้อมูลหัวหน้าผู้เฝ้า ---------- */
+.rl-group {
+  margin: var(--space-2xs) 0 0;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  color: var(--color-ink-3);
+}
+
+.rl-list .rl-foe {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--rl-monster);
+}
+
+.rl-items {
+  grid-auto-columns: minmax(0, 1fr);
 }

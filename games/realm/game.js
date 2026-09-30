@@ -34,6 +34,7 @@
   var opts = FG.store.get(OPTS, null) || {};
   if (!MODES[opts.mode]) opts.mode = 'solo2';
   if (!R.LENGTHS[opts.length]) opts.length = 'short';
+  if (R.MAP_IDS.indexOf(opts.map) === -1) opts.map = 'classic';
 
   // S = { s: สถานะเกมจาก engine, mode, holder: ผู้เล่น (คน) ที่ถือเครื่องอยู่, log: [ข้อความล่าสุด] }
   var S = null;
@@ -56,6 +57,7 @@
     shop: '<path d="M4 9l2-5h12l2 5"/><path d="M4 9a2.7 2.7 0 0 0 5.3 0 2.7 2.7 0 0 0 5.4 0 2.7 2.7 0 0 0 5.3 0"/><path d="M5.5 11v9h13v-9"/><path d="M10 20v-5h4v5"/>',
     rest: '<path d="M4 15c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5M4 19c2 0 2-1.5 4-1.5s2 1.5 4 1.5 2-1.5 4-1.5 2 1.5 4 1.5"/><path d="M9 10c-1-1.5 1-2.5 0-4.5M13 10c-1-1.5 1-2.5 0-4.5M17 10c-1-1.5 1-2.5 0-4.5"/>',
     town: '<path d="M4 20V8h3v2h2V8h3v2h2V8h3v2h2V8h1v12z"/><path d="M10 20v-4a2 2 0 0 1 4 0v4"/>',
+    card: '<rect x="5" y="3.5" width="11" height="15" rx="1.8" transform="rotate(-8 10.5 11)"/><rect x="8.5" y="5.5" width="11" height="15" rx="1.8"/><path d="M14 10.2l.9 1.9 2 .3-1.5 1.4.4 2-1.8-1-1.8 1 .4-2-1.5-1.4 2-.3z"/>',
     coin: '<circle cx="12" cy="12" r="8"/><path d="M12 8v8"/>',
     heart: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/>',
     sword: '<path d="M14.5 4H20v5.5L9 20.5 3.5 15z"/><path d="M5 13l6 6M3 21l2.5-2.5"/>',
@@ -67,27 +69,44 @@
     return '<svg class="' + (cls || 'rl-ico') + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + (GL[name] || '') + '</svg>';
   }
 
-  /* ---------- ตำแหน่งช่องบนกระดาน 8×9 (วนตามเข็ม เริ่มมุมซ้ายบน) ---------- */
-  function cellPos(i) {
-    if (i < 8) return { r: 1, c: i + 1 };
-    if (i < 16) return { r: i - 6, c: 8 };
-    if (i < 23) return { r: 9, c: 8 - (i - 15) };
-    return { r: 9 - (i - 22), c: 1 };
+  /* ---------- ตำแหน่งช่องรอบขอบตาราง cols×rows (วนตามเข็ม เริ่มมุมซ้ายบน) ----------
+   * แดนมนตร์ 8×9 = 30 ช่อง · หมู่เกาะหิ่งห้อย 6×8 = 24 ช่อง */
+  function cellPos(i, cols, rows) {
+    if (i < cols) return { r: 1, c: i + 1 };
+    if (i < cols + rows - 1) return { r: i - cols + 2, c: cols };
+    if (i < 2 * cols + rows - 2) return { r: rows, c: cols - (i - (cols + rows - 2)) };
+    return { r: rows - (i - (2 * cols + rows - 3)), c: 1 };
   }
 
-  (function buildBoard() {
-    for (var i = 0; i < R.SIZE; i++) {
+  var boardMap = null;
+  // สร้างช่องกระดานใหม่เมื่อแผนที่เปลี่ยน (ช่องกลางกระดานคงอยู่)
+  function buildBoard(s) {
+    var M = R.mapOf(s);
+    if (boardMap === M.id && cells.length === s.board.length) return;
+    boardMap = M.id;
+    cells.forEach(function (c) {
+      boardEl.removeChild(c);
+    });
+    cells = [];
+    boardEl.style.setProperty('--cols', String(M.cols));
+    boardEl.style.setProperty('--rows', String(M.rows));
+    boardEl.setAttribute('data-map', M.id);
+    for (var i = 0; i < s.board.length; i++) {
       var b = document.createElement('button');
       b.type = 'button';
       b.className = 'rl-cell';
-      var pos = cellPos(i);
+      var pos = cellPos(i, M.cols, M.rows);
       b.style.gridRow = String(pos.r);
       b.style.gridColumn = String(pos.c);
       b.addEventListener('click', cellInfo.bind(null, i));
       boardEl.appendChild(b);
       cells.push(b);
     }
-  })();
+  }
+
+  function townName(k) {
+    return R.townDef(S.s, k).name;
+  }
 
   /* ---------- ตัวช่วย ---------- */
   function P(i) {
@@ -153,7 +172,7 @@
   }
 
   /* ---------- เริ่มเกม ---------- */
-  function newGame(mode, length) {
+  function newGame(mode, length, map) {
     clearTimeout(timer);
     queue = [];
     busy = false;
@@ -163,12 +182,14 @@
     hideResult = false;
     opts.mode = mode;
     opts.length = length;
+    opts.map = map;
     FG.store.set(OPTS, opts);
+    dieEl.textContent = '';
     var defs = MODES[mode].players.map(function (d) {
       return { name: d.name, cpu: !!d.cpu };
     });
-    S = { s: R.newGame({ players: defs, length: length }), mode: mode, holder: mode === 'duo' ? -1 : 0, log: [] };
-    addLog('เริ่มเกม ' + LEN_LABEL[length] + ' ' + S.s.rounds + ' รอบ · ' + MODES[mode].label);
+    S = { s: R.newGame({ players: defs, length: length, map: map }), mode: mode, holder: mode === 'duo' ? -1 : 0, log: [] };
+    addLog('เริ่มเกม ' + R.MAPS[map].name + ' · ' + LEN_LABEL[length] + ' ' + S.s.rounds + ' รอบ · ' + MODES[mode].label);
     addLog('ตาของ ' + P(0).name);
     save();
     render();
@@ -178,7 +199,28 @@
   function setupSheet(canCancel) {
     var mode = opts.mode;
     var length = opts.length;
+    var map = opts.map;
     var body = document.createElement('div');
+    body.appendChild(FG.label('แผนที่'));
+    var mapNote = document.createElement('p');
+    mapNote.className = 'rl-note';
+    function paintMapNote() {
+      mapNote.textContent = R.MAPS[map].blurb;
+    }
+    body.appendChild(
+      FG.choice(
+        R.MAP_IDS.map(function (k) {
+          return { value: k, label: R.MAPS[k].name };
+        }),
+        map,
+        function (v) {
+          map = v;
+          paintMapNote();
+        }
+      )
+    );
+    paintMapNote();
+    body.appendChild(mapNote);
     body.appendChild(FG.label('ผู้เล่น: คุณเล่นกับคอม หรือ 2 คนบนเครื่องเดียว (+ คอม 1 ตัว)'));
     body.appendChild(
       FG.choice(
@@ -207,7 +249,7 @@
     note.className = 'rl-note';
     note.textContent = 'เวลาเล่นโดยประมาณ: สั้น ' + LEN_TIME.short + ' · กลาง ' + LEN_TIME.mid + ' · ยาว ' + LEN_TIME.long + ' · โหมด 2 คน ส่งเครื่องให้กันตอนเปลี่ยนตา';
     body.appendChild(note);
-    var actions = [{ label: 'เริ่มเกม', primary: true, onClick: function () { newGame(mode, length); } }];
+    var actions = [{ label: 'เริ่มเกม', primary: true, onClick: function () { newGame(mode, length, map); } }];
     if (canCancel) actions.unshift({ label: 'ยกเลิก' });
     FG.sheet({ title: 'เกมใหม่', body: body, actions: actions, dismissible: !!canCancel });
   }
@@ -261,8 +303,11 @@
         FG.buzz(10);
         return 380;
       case 'move': {
+        // steps < 0 = ถอยหลัง (ไพ่ทรายดูด)
+        var size = S.s.board.length;
         var steps = [];
-        for (var k = 1; k <= e.steps; k++) steps.push({ k: 'step', p: e.p, pos: (e.from + k) % R.SIZE });
+        var dir = e.steps < 0 ? -1 : 1;
+        for (var k = 1; k <= Math.abs(e.steps); k++) steps.push({ k: 'step', p: e.p, pos: (((e.from + dir * k) % size) + size) % size });
         anim = { p: e.p, pos: e.from };
         queue = steps.concat(queue);
         return 0;
@@ -270,6 +315,25 @@
       case 'step':
         anim = { p: e.p, pos: e.pos };
         return 170;
+      case 'warp':
+        anim = { p: e.p, pos: e.to };
+        FG.buzz(15);
+        return 550;
+      case 'card':
+        addLog(e.t);
+        if (isHuman(e.p)) {
+          view = { kind: 'card', e: e };
+          return -1;
+        }
+        FG.toast(P(e.p).name + ' เปิดไพ่: ' + e.name, 2200);
+        return 1100;
+      case 'card-fx':
+      case 'ward':
+      case 'fest':
+      case 'boots':
+        addLog(e.t);
+        if (e.k === 'fest' || e.k === 'ward') FG.toast(e.t, 2200);
+        return cpuSide || e.k !== 'boots' ? 650 : 0;
       case 'turn':
         anim = null;
         addLog(e.t);
@@ -359,13 +423,14 @@
     if (!evs) {
       lastBattle = null;
       if (action.item === 'potion') FG.toast('ใช้ยาไม่ได้ — ไม่มียา หรือพลังชีวิตเต็มอยู่แล้ว', 1800);
+      else if (action.item) FG.toast('ใช้ไม่ได้ — ไม่มีของชิ้นนี้', 1600);
       return;
     }
     // อัปเดตภาพหน้าต่างต่อสู้จากผลยกนี้
     evs.forEach(function (e) {
       if (e.k === 'hit') {
         lastBattle.hp = Math.max(0, lastBattle.hp - e.dealt);
-        lastBattle.n += 1;
+        if (e.me !== 'B') lastBattle.n += 1; // ระเบิดไม่นับเป็นยก
         lastBattle.last = { me: e.me, foe: e.foe, dealt: e.dealt, took: e.took };
         if (e.took) FG.buzz(25);
       }
@@ -418,12 +483,14 @@
 
   function renderBoard() {
     var s = S.s;
-    for (var i = 0; i < R.SIZE; i++) {
+    buildBoard(s);
+    for (var i = 0; i < s.board.length; i++) {
       var sp = s.board[i];
       var el = cells[i];
-      var cls = 'rl-cell t-' + sp.t;
+      var kind = sp.t === 'gold' ? 'chest' : sp.t; // ชนิดช่องเก่า (ถุงเงิน) = หีบสมบัติ
+      var cls = 'rl-cell t-' + kind;
       var extra = '';
-      var label = R.SPACE_NAME[sp.t];
+      var label = R.SPACE_NAME[kind];
       if (sp.t === 'town') {
         var t = s.towns[sp.town];
         label = R.TOWNS[t.i].name;
@@ -445,13 +512,14 @@
       });
       el.className = cls;
       el.setAttribute('aria-label', 'ช่อง ' + (i + 1) + ': ' + label);
-      el.innerHTML = svg(sp.t) + extra + (toks ? '<span class="rl-toks">' + toks + '</span>' : '');
+      el.innerHTML = svg(kind) + extra + (toks ? '<span class="rl-toks">' + toks + '</span>' : '');
     }
   }
 
   function renderCenter() {
     var s = S.s;
-    roundEl.textContent = s.phase === 'over' ? 'จบเกม' : 'รอบ ' + s.round + ' / ' + s.rounds;
+    roundEl.textContent = s.phase === 'over' ? 'จบเกม' : 'รอบ ' + s.round + ' / ' + s.rounds + (s.fest > 0 ? ' · เทศกาล ×' + R.FEST_MULT : '');
+    roundEl.classList.toggle('is-fest', s.phase !== 'over' && s.fest > 0);
     if (!dieEl.textContent) dieEl.textContent = s.lastRoll ? String(s.lastRoll) : '–';
     logEl.innerHTML = S.log
       .slice(-4)
@@ -496,13 +564,20 @@
     }
     var p = P(d);
     if (s.phase === 'roll') {
-      msgEl.textContent = 'ตาของ ' + p.name + ' — แตะทอยเต๋า';
+      msgEl.textContent = 'ตาของ ' + p.name + ' — ' + (p.fast ? 'สวมรองเท้าลมกรดแล้ว ตานี้ทอย 2 ลูก' : 'แตะทอยเต๋า');
       actionsEl.appendChild(
-        btn('ยาฟื้นพลัง ×' + p.potion, function () {
+        btn('ยา ×' + p.potion, function () {
           act({ type: 'use', item: 'potion' });
         }, false, p.potion <= 0 || p.hp >= p.mhp)
       );
-      actionsEl.appendChild(btn('ทอยเต๋า', function () {
+      if (p.boots > 0 || p.fast) {
+        actionsEl.appendChild(
+          btn('รองเท้า ×' + p.boots, function () {
+            act({ type: 'use', item: 'boots' });
+          }, false, p.boots <= 0 || p.fast)
+        );
+      }
+      actionsEl.appendChild(btn(p.fast ? 'ทอย 2 ลูก' : 'ทอยเต๋า', function () {
         act({ type: 'roll' });
       }, true));
       return;
@@ -510,7 +585,7 @@
     if (s.phase === 'decide') {
       var k = s.pending.kind;
       if (k === 'duel-offer') {
-        msgEl.textContent = 'เจอผู้เล่นอื่น — ท้าประลอง 3 ยก? ชนะได้เงินอีกฝ่าย 15% (ไม่เสียพลังชีวิต)';
+        msgEl.textContent = 'เจอผู้เล่นอื่น — ท้าประลอง 3 ยก? ชนะได้เงินอีกฝ่าย ' + Math.round(R.DUEL_TAKE * 100) + '% (ไม่เสียพลังชีวิต)';
         s.pending.targets.forEach(function (t) {
           actionsEl.appendChild(btn('ท้า ' + esc(P(t).name), function () {
             act({ type: 'duel', target: t });
@@ -522,11 +597,11 @@
         return;
       }
       if (k === 'town') {
-        var T = R.TOWNS[s.pending.town];
-        var m = R.monsterById(T.guard);
-        var fee = R.claimFee(s.pending.town);
+        var T = R.townDef(s, s.pending.town);
+        var m = R.guardFoe(s, s.pending.town, 1);
+        var fee = R.claimFee(s.towns[s.pending.town].i);
         msgEl.innerHTML =
-          '<b>' + esc(T.name) + '</b> มี<b>' + esc(m.name) + '</b>เฝ้าอยู่ (' + habit(m.bias) + ') · ชนะแล้วจ่ายค่าฟื้นฟู ' + fee + ' เหรียญ ได้เมืองมูลค่า ' + T.base +
+          '<b>' + esc(T.name) + '</b> มี<b>' + esc(m.name) + '</b>เฝ้าอยู่ (พลังชีวิต ' + m.hp + ' · ' + habit(m.bias) + ') · ชนะแล้วจ่ายค่าฟื้นฟู ' + fee + ' เหรียญ ได้เมืองมูลค่า ' + T.base +
           (p.gold < fee ? ' · <span class="rl-warn">เงินยังไม่พอค่าฟื้นฟู</span>' : '');
         actionsEl.appendChild(btn('ผ่านไป', function () {
           act({ type: 'skip' });
@@ -536,7 +611,7 @@
         }, true));
         return;
       }
-      msgEl.textContent = k === 'shop' ? 'แวะร้านพ่อค้าเร่' : 'ลงทุนขยายเมือง';
+      msgEl.textContent = k === 'shop' ? 'แวะร้านพ่อค้าเร่' : 'ขยายเมือง (ต้องสู้ชนะก่อน)';
       return;
     }
     if (s.phase === 'battle') {
@@ -564,6 +639,7 @@
     coverEl.hidden = true;
     if (view && view.kind === 'battle') return battleView(view.b, view.e);
     if (view && view.kind === 'duel') return duelResult(view.e);
+    if (view && view.kind === 'card') return cardView(view.e);
     var d = R.decider(s);
     if (s.phase === 'over') {
       if (busy || hideResult) {
@@ -596,13 +672,16 @@
     var last = b.last;
     var lastHtml = '';
     if (last) {
-      lastHtml =
-        last.me === 'P'
-          ? esc(p.name) + ' ดื่มยา · ' + esc(b.name) + (last.foe === 'D' ? ' ตั้งท่ารอ' : ' ฉวย' + R.MOVE_NAME[last.foe] + ' โดน ' + last.took)
-          : esc(p.name) + ' <b>' + R.MOVE_NAME[last.me] + '</b> · ' + esc(b.name) + '<b>' + R.MOVE_NAME[last.foe] + '</b><br>ทำได้ ' + last.dealt + ' · โดน ' + last.took;
+      if (last.me === 'B') lastHtml = esc(p.name) + ' ขว้าง<b>ระเบิดประกายไฟ</b> ทำได้ ' + last.dealt + ' · ' + esc(b.name) + 'ตั้งตัวไม่ทัน';
+      else
+        lastHtml =
+          last.me === 'P'
+            ? esc(p.name) + ' ดื่มยา · ' + esc(b.name) + (last.foe === 'D' ? ' ตั้งท่ารอ' : ' ฉวย' + R.MOVE_NAME[last.foe] + ' โดน ' + last.took)
+            : esc(p.name) + ' <b>' + R.MOVE_NAME[last.me] + '</b> · ' + esc(b.name) + '<b>' + R.MOVE_NAME[last.foe] + '</b><br>ทำได้ ' + last.dealt + ' · โดน ' + last.took;
     }
+    var where = b.town < 0 ? 'ป่ามอนสเตอร์' : b.up ? 'ขยาย' + esc(townName(b.town)) + ' → ระดับ ' + b.up : 'ผู้เฝ้า' + esc(townName(b.town));
     var html =
-      '<p class="rl-ov__kicker">' + (b.town >= 0 ? 'ผู้เฝ้า' + esc(R.TOWNS[b.town].name) : 'ป่ามอนสเตอร์') + ' · ยกที่ ' + Math.max(1, Math.min(b.n + (endEv ? 0 : 1), R.MAX_EXCHANGES)) + '/' + R.MAX_EXCHANGES + '</p>' +
+      '<p class="rl-ov__kicker">' + where + ' · ยกที่ ' + Math.max(1, Math.min(b.n + (endEv ? 0 : 1), R.MAX_EXCHANGES)) + '/' + R.MAX_EXCHANGES + '</p>' +
       '<div class="rl-fight">' +
       '<div class="rl-fighter"><span class="rl-fighter__name">' + svg('monster', 'rl-fighter__ico') + esc(b.name) + '</span>' + hpBar(b.hp, b.mhp, 'is-foe') +
       '<span class="rl-fighter__stat num">' + b.hp + '/' + b.mhp + ' · โจมตี ' + b.atk + ' · ป้องกัน ' + b.def + '</span>' +
@@ -623,8 +702,9 @@
         return '<button type="button" class="rl-move m-' + m + '" data-m="' + m + '"><b>' + R.MOVE_NAME[m] + '</b><span>' + MOVE_HINT[m] + '</span></button>';
       }).join('') +
       '</div>' +
-      '<div class="rl-ov__actions">' +
+      '<div class="rl-ov__actions rl-items">' +
       '<button type="button" class="btn" data-item="potion"' + (p.potion > 0 && p.hp < p.mhp ? '' : ' disabled') + '>ยา ×' + p.potion + '</button>' +
+      '<button type="button" class="btn" data-item="bomb"' + (p.bomb > 0 ? '' : ' disabled') + '>ระเบิด ×' + p.bomb + '</button>' +
       '<button type="button" class="btn" data-item="smoke"' + (p.smoke > 0 ? '' : ' disabled') + '>ลูกควัน ×' + p.smoke + '</button>' +
       '</div>';
     showOv(html, 'battle');
@@ -651,7 +731,7 @@
     var foe = me === d.a ? d.b : d.a;
     var challenged = me === d.b;
     var html =
-      '<p class="rl-ov__kicker">ประลอง 3 ยก · ไม่เสียพลังชีวิต · ชนะได้เงินอีกฝ่าย 15%</p>' +
+      '<p class="rl-ov__kicker">ประลอง 3 ยก · ไม่เสียพลังชีวิต · ชนะได้เงินอีกฝ่าย ' + Math.round(R.DUEL_TAKE * 100) + '%</p>' +
       '<h2 class="rl-ov__title">' + dot(me) + esc(P(me).name) + ' วางแผน 3 ท่า</h2>' +
       '<p class="rl-note">' + (challenged ? esc(P(d.a).name) + ' ท้าคุณ! ' : '') + 'คู่ประลอง: ' + esc(P(foe).name) + ' (โจมตี ' + R.atkOf(P(foe)) + ' · ป้องกัน ' + R.defOf(P(foe)) + ') · ใครทำแรงรวมได้มากกว่าชนะ' + (humans() >= 2 && !P(foe).cpu ? ' · อีกคนห้ามดู' : '') + '</p>' +
       '<div class="rl-slots">' +
@@ -712,24 +792,62 @@
     ovBox.querySelector('[data-go]').addEventListener('click', closeView);
   }
 
+  // ไพ่เหตุการณ์ของคน: แสดงไพ่ให้อ่านก่อน แล้วแตะไปต่อ (ผลเกิดแล้วในเครื่องยนต์ บันทึกอยู่ในบันทึกเหตุการณ์)
+  function cardView(e) {
+    var html =
+      '<p class="rl-ov__kicker">' + dot(e.p) + esc(P(e.p).name) + ' · ศาลาเสี่ยงทาย</p>' +
+      '<div class="rl-card ' + (e.good ? 'is-good' : 'is-bad') + '">' +
+      '<span class="rl-card__tag">' + (e.good ? 'ไพ่ดี' : 'ไพ่ร้าย') + '</span>' +
+      svg('card', 'rl-card__ico') +
+      '<h2 class="rl-card__name">' + esc(e.name) + '</h2>' +
+      '<p class="rl-card__text">' + esc(e.text) + '</p>' +
+      '</div>' +
+      '<div class="rl-ov__actions"><button type="button" class="btn btn--primary" data-go="1">ไปต่อ</button></div>';
+    showOv(html, 'card');
+    ovBox.querySelector('[data-go]').addEventListener('click', closeView);
+  }
+
+  function gearText(p) {
+    var c = R.charmOf(p);
+    return (p.w >= 0 ? R.WEAPONS[p.w].name : 'มือเปล่า') + ' · ' + (p.ar >= 0 ? R.ARMORS[p.ar].name : 'ไม่มีเกราะ') + ' · ' + (c ? c.name : 'ไม่มีเครื่องราง');
+  }
+
+  function bagText(p) {
+    return R.ITEM_IDS.map(function (id) {
+      return R.ITEMS[id].name + ' ' + p[id];
+    }).join(' · ');
+  }
+
+  var SHOP_GROUPS = [
+    { id: 'item', label: 'ของใช้ (ใช้แล้วหมด)' },
+    { id: 'gear', label: 'อาวุธ · เกราะ (อัปเกรดทีละขั้น)' },
+    { id: 'charm', label: 'เครื่องราง (ใส่ได้ชิ้นเดียว)' }
+  ];
+
   function shop() {
     var p = P(S.s.turn);
     var list = R.shopList(p);
-    var gear = (p.w >= 0 ? R.WEAPONS[p.w].name : 'มือเปล่า') + ' · ' + (p.ar >= 0 ? R.ARMORS[p.ar].name : 'ไม่มีเกราะ');
     var html =
       '<h2 class="rl-ov__title">' + svg('shop', 'rl-title-ico') + 'ร้านพ่อค้าเร่</h2>' +
-      '<p class="rl-note">' + esc(p.name) + ' มี <b class="num">' + FG.fmtNum(p.gold) + '</b> เหรียญ · ยา ' + p.potion + ' · ลูกควัน ' + p.smoke + '<br>ตอนนี้ใช้: ' + esc(gear) + '</p>' +
-      '<ul class="rl-list">' +
-      list
-        .map(function (it) {
-          return (
-            '<li><span><b>' + esc(it.name) + '</b><small>' + esc(it.note) + '</small></span>' +
-            '<button type="button" class="btn" data-buy="' + it.id + '"' + (it.ok ? '' : ' disabled') + '><span class="num">' + it.price + '</span></button></li>'
-          );
-        })
-        .join('') +
-      '</ul>' +
-      '<div class="rl-ov__actions"><button type="button" class="btn btn--primary" data-leave="1">ออกจากร้าน</button></div>';
+      '<p class="rl-note">' + esc(p.name) + ' มี <b class="num">' + FG.fmtNum(p.gold) + '</b> เหรียญ<br>ตอนนี้ใช้: ' + esc(gearText(p)) + '</p>';
+    SHOP_GROUPS.forEach(function (g) {
+      var rows = list.filter(function (it) {
+        return it.group === g.id;
+      });
+      if (!rows.length) return;
+      html +=
+        '<p class="rl-group">' + g.label + '</p><ul class="rl-list">' +
+        rows
+          .map(function (it) {
+            return (
+              '<li><span><b>' + esc(it.name) + '</b><small>' + esc(it.note) + '</small></span>' +
+              '<button type="button" class="btn" data-buy="' + it.id + '"' + (it.ok ? '' : ' disabled') + '><span class="num">' + it.price + '</span></button></li>'
+            );
+          })
+          .join('') +
+        '</ul>';
+    });
+    html += '<div class="rl-ov__actions"><button type="button" class="btn btn--primary" data-leave="1">ออกจากร้าน</button></div>';
     showOv(html, 'shop');
     ovBox.querySelectorAll('[data-buy]').forEach(function (el) {
       el.addEventListener('click', function () {
@@ -745,29 +863,27 @@
     var s = S.s;
     var p = P(s.turn);
     var html =
-      '<h2 class="rl-ov__title">' + svg('town', 'rl-title-ico') + 'ลงทุนขยายเมือง</h2>' +
-      '<p class="rl-note">' + (s.pending.bank ? 'ผ่านลานประตูเมือง เลือกขยายได้ 1 เมือง · ' : '') + 'มี <b class="num">' + FG.fmtNum(p.gold) + '</b> เหรียญ · เงินที่ลงเพิ่มเป็นมูลค่าเมืองเท่ากัน และค่าผ่านทางแพงขึ้น</p>' +
+      '<h2 class="rl-ov__title">' + svg('town', 'rl-title-ico') + 'ขยายเมือง</h2>' +
+      '<p class="rl-note">' + (s.pending.bank ? 'ผ่านลานประตูเมือง เลือกขยายได้ 1 เมือง · ' : '') + 'มี <b class="num">' + FG.fmtNum(p.gold) + '</b> เหรียญ · พลังชีวิต ' + p.hp + '/' + p.mhp +
+      '<br>ขยายทีละ 1 ระดับ: <b>ต้องสู้ชนะหัวหน้าผู้เฝ้าก่อน</b> แล้วจึงจ่ายค่าลงทุน (แพ้ = เหรียญหล่น + พักฟื้น 1 ตา ไม่เสียค่าลงทุน · หนีได้ด้วยลูกควัน)</p>' +
       '<ul class="rl-list">';
     s.pending.towns.forEach(function (ti) {
       var t = s.towns[ti];
       var cost = R.investCost(t);
-      var room = R.MAX_TOWN_LEVEL - t.level;
-      var btns = '';
-      for (var n = 1; n <= room; n++) {
-        var ok = cost * n <= p.gold;
-        t.level += n;
-        var nt = R.toll(t);
-        t.level -= n;
-        btns += '<button type="button" class="btn" data-town="' + ti + '" data-n="' + n + '"' + (ok ? '' : ' disabled') + '>+' + n + ' <small class="num">' + cost * n + '</small><small>ค่าผ่าน ' + nt + '</small></button>';
-      }
+      var foe = R.upgradeFoe(s, ti);
+      t.level += 1;
+      var nt = R.toll(t);
+      t.level -= 1;
       html +=
-        '<li class="rl-inv"><span><b>' + esc(R.TOWNS[ti].name) + '</b><small>ระดับ ' + t.level + '/' + R.MAX_TOWN_LEVEL + ' · มูลค่า ' + R.townValue(t) + ' · ค่าผ่านทาง ' + R.toll(t) + '</small></span><span class="rl-inv__btns">' + btns + '</span></li>';
+        '<li class="rl-inv"><span><b>' + esc(townName(ti)) + '</b><small>ระดับ ' + t.level + ' → ' + (t.level + 1) + ' · ค่าลงทุน ' + cost + ' · ค่าผ่านทาง ' + R.toll(t) + ' → ' + nt + '</small>' +
+        '<small class="rl-foe">' + svg('monster', 'rl-mini') + esc(foe.name) + ': พลังชีวิต ' + foe.hp + ' · โจมตี ' + foe.atk + ' · ป้องกัน ' + foe.def + ' · ' + habit(foe.bias) + '</small></span>' +
+        '<span class="rl-inv__btns"><button type="button" class="btn" data-town="' + ti + '"' + (cost <= p.gold ? '' : ' disabled') + '>' + svg('swords', 'rl-btn-ico') + 'สู้เพื่อขยาย</button></span></li>';
     });
-    html += '</ul><div class="rl-ov__actions"><button type="button" class="btn btn--primary" data-no="1">ไม่ลงทุน</button></div>';
+    html += '</ul><div class="rl-ov__actions"><button type="button" class="btn btn--primary" data-no="1">ไม่ขยาย</button></div>';
     showOv(html, 'invest');
     ovBox.querySelectorAll('[data-town]').forEach(function (el) {
       el.addEventListener('click', function () {
-        act({ type: 'invest', town: Number(el.getAttribute('data-town')), levels: Number(el.getAttribute('data-n')) });
+        act({ type: 'invest', town: Number(el.getAttribute('data-town')), levels: 1 });
       });
     });
     ovBox.querySelector('[data-no]').addEventListener('click', function () {
@@ -788,7 +904,7 @@
       .join('');
     var facts = s.players
       .map(function (p, i) {
-        return dot(i) + esc(p.name) + ': Lv ' + p.lv + ' · ชนะมอนสเตอร์ ' + p.st.wins + ' · แพ้ ' + p.st.losses + ' · ยึดเมือง ' + p.st.captured + ' · ได้ค่าผ่านทาง ' + p.st.tollGot;
+        return dot(i) + esc(p.name) + ': Lv ' + p.lv + ' · ชนะมอนสเตอร์ ' + p.st.wins + ' · แพ้ ' + p.st.losses + ' · ยึดเมือง ' + p.st.captured + ' · ขยายเมือง ' + (p.st.upWin || 0) + '/' + (p.st.upTry || 0) + ' · ได้ค่าผ่านทาง ' + p.st.tollGot;
       })
       .join('<br>');
     var html =
@@ -841,13 +957,14 @@
       })
       .filter(Boolean);
     var text = '';
-    var title = R.SPACE_NAME[sp.t];
+    var kind = sp.t === 'gold' ? 'chest' : sp.t;
+    var title = R.SPACE_NAME[kind];
     var DESC = {
-      start: 'ผ่าน = รับเงินหลวง ' + R.SALARY + ' + 10 ต่อเมืองที่มี (คนทรัพย์น้อยสุดได้เพิ่ม) แล้วลงทุนเมืองได้ 1 เมือง · หยุดพอดี = โบนัสเพิ่ม',
-      gold: 'เก็บเงินได้ 15–55 เหรียญ (ท้ายเกมได้มากขึ้น)',
+      start: 'ผ่าน = รับเงินหลวง ' + R.SALARY + ' + 10 ต่อเมืองที่มี (คนทรัพย์น้อยสุดได้เพิ่ม) แล้วขยายเมืองได้ 1 เมือง (ต้องสู้ชนะก่อน) · หยุดพอดี = โบนัสเพิ่ม',
       monster: 'เจอมอนสเตอร์สุ่ม ยิ่งท้ายเกมยิ่งเก่ง · ชนะได้เงิน + ค่าประสบการณ์',
-      chest: 'ของสุ่ม: เงิน · ยา · ลูกควัน · ยาเสริมแรง · เครื่องรางเพิ่มพลังชีวิต',
-      shop: 'ซื้อยา ลูกควัน ดาบ เกราะ',
+      chest: 'ครึ่งหนึ่งได้เงิน 20–60 (ท้ายเกมได้มากขึ้น) · อีกครึ่งได้ของ: ยา · ลูกควัน · ระเบิด · รองเท้า · ยันต์ · ยาเสริมแรง · ผลโอ๊กเพิ่มพลังชีวิต',
+      card: 'เปิดไพ่เหตุการณ์ 1 ใบ (ไพ่ดี 10 · ไพ่ร้าย 6 ในกอง 16 ใบ) · ไพ่ร้ายเสียไม่เกิน 60 · ยันต์กันเคราะห์กันไพ่ร้ายได้',
+      shop: 'ซื้อของใช้ อาวุธ เกราะ (4 ขั้น) และเครื่องราง',
       rest: 'พลังชีวิตกลับมาเต็ม'
     };
     if (sp.t === 'town') {
@@ -855,12 +972,16 @@
       var T = R.TOWNS[t.i];
       title = T.name;
       if (t.owner < 0) {
-        var m = R.monsterById(T.guard);
-        text = 'ยังไม่มีเจ้าของ · ผู้เฝ้า: ' + m.name + ' (' + habit(m.bias) + ') · ชนะแล้วจ่ายค่าฟื้นฟู ' + R.claimFee(t.i) + ' · มูลค่า ' + T.base;
+        var m = R.guardFoe(s, sp.town, 1);
+        text = 'ยังไม่มีเจ้าของ · ผู้เฝ้า: ' + m.name + ' (พลังชีวิต ' + m.hp + ' · ' + habit(m.bias) + ') · ชนะแล้วจ่ายค่าฟื้นฟู ' + R.claimFee(t.i) + ' · มูลค่า ' + T.base;
       } else {
-        text = 'ของ ' + P(t.owner).name + ' · ระดับ ' + t.level + '/' + R.MAX_TOWN_LEVEL + ' · มูลค่า ' + R.townValue(t) + ' · ค่าผ่านทาง ' + R.toll(t);
+        text = 'ของ ' + P(t.owner).name + ' · ระดับ ' + t.level + '/' + R.MAX_TOWN_LEVEL + ' · มูลค่า ' + R.townValue(t) + ' · ค่าผ่านทาง ' + R.toll(t) + (s.fest > 0 ? ' (ช่วงเทศกาล ×' + R.FEST_MULT + ')' : '');
+        if (t.level < R.MAX_TOWN_LEVEL) {
+          var up = R.upgradeFoe(s, sp.town);
+          text += ' · ขยายต่อ: สู้' + up.name + ' (พลังชีวิต ' + up.hp + ') แล้วจ่าย ' + R.investCost(t);
+        }
       }
-    } else text = DESC[sp.t] || '';
+    } else text = DESC[kind] || '';
     if (here.length) text += ' · อยู่ที่นี่: ' + here.join(', ');
     FG.sheet({ title: title, text: esc(text), actions: [{ label: 'ปิด', primary: true }] });
   }
@@ -873,10 +994,12 @@
         return R.TOWNS[t.i].name + ' (ระดับ ' + t.level + ')';
       })
       .join(', ');
+    var charm = R.charmOf(p);
     var text =
       'Lv ' + p.lv + ' (ค่าประสบการณ์ ' + p.xp + '/' + R.xpNeed(p.lv) + ') · พลังชีวิต ' + p.hp + '/' + p.mhp + '<br>' +
-      'โจมตี ' + R.atkOf(p) + (p.w >= 0 ? ' (' + esc(R.WEAPONS[p.w].name) + ')' : '') + ' · ป้องกัน ' + R.defOf(p) + (p.ar >= 0 ? ' (' + esc(R.ARMORS[p.ar].name) + ')' : '') + '<br>' +
-      'ยา ' + p.potion + ' · ลูกควัน ' + p.smoke + ' · เงิน ' + FG.fmtNum(p.gold) + '<br>' +
+      'โจมตี ' + R.atkOf(p) + (p.w >= 0 ? ' (' + esc(R.WEAPONS[p.w].name) + ' ขั้น ' + (p.w + 1) + ')' : '') + ' · ป้องกัน ' + R.defOf(p) + (p.ar >= 0 ? ' (' + esc(R.ARMORS[p.ar].name) + ' ขั้น ' + (p.ar + 1) + ')' : '') + '<br>' +
+      'เครื่องราง: ' + (charm ? '<b>' + esc(charm.name) + '</b> — ' + esc(charm.note) : 'ยังไม่มี') + '<br>' +
+      esc(bagText(p)) + '<br>เงิน ' + FG.fmtNum(p.gold) + '<br>' +
       'เมือง: ' + (towns ? esc(towns) : 'ยังไม่มี') + '<br>ทรัพย์รวม (เงิน + มูลค่าเมือง): <b>' + FG.fmtNum(R.total(s, i)) + '</b>';
     FG.sheet({ title: esc(p.name) + (p.cpu ? ' (คอม)' : ''), text: text, actions: [{ label: 'ปิด', primary: true }] });
   }
@@ -917,14 +1040,16 @@
   /* ---------- เปิดหน้า ---------- */
   (function boot() {
     var saved = FG.store.get(KEY, null);
-    if (saved && saved.s && saved.s.v === 1 && saved.s.players && MODES[saved.mode]) {
-      S = { s: saved.s, mode: saved.mode, holder: saved.holder == null ? -1 : saved.holder, log: Array.isArray(saved.log) ? saved.log : [] };
+    // เซฟรุ่นเก่า (v1 ยังไม่มีแผนที่) → แปลงเป็นรุ่นปัจจุบันบนแผนที่ฉบับเดิม · เซฟเสียหาย = เริ่มใหม่
+    var loaded = saved && saved.s && MODES[saved.mode] ? R.migrate(saved.s) : null;
+    if (loaded) {
+      S = { s: loaded, mode: saved.mode, holder: saved.holder == null ? -1 : saved.holder, log: Array.isArray(saved.log) ? saved.log : [] };
       if (S.s.phase !== 'over') {
         if (humans() >= 2) S.holder = -1; // เปิดกลับมา = ขึ้นจอบังก่อนเสมอ
         render();
         FG.sheet({
           title: 'มีเกมค้างอยู่',
-          text: MODES[S.mode].label + ' · รอบ ' + S.s.round + '/' + S.s.rounds,
+          text: R.mapOf(S.s).name + ' · ' + MODES[S.mode].label + ' · รอบ ' + S.s.round + '/' + S.s.rounds,
           actions: [
             { label: 'เริ่มใหม่', onClick: function () { setTimeout(function () { setupSheet(true); }, 0); } },
             { label: 'เล่นต่อ', primary: true, onClick: schedule }
@@ -939,7 +1064,7 @@
       return;
     }
     // ยังไม่เคยเล่น: วาดกระดานเปล่าไว้ข้างหลังหน้าตั้งค่า
-    S = { s: R.newGame({ players: MODES[opts.mode].players, length: opts.length, seed: 1 }), mode: opts.mode, holder: 0, log: [] };
+    S = { s: R.newGame({ players: MODES[opts.mode].players, length: opts.length, map: opts.map, seed: 1 }), mode: opts.mode, holder: 0, log: [] };
     hideResult = true;
     render();
     S = null;

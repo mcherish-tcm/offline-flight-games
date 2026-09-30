@@ -19,6 +19,7 @@
     <link rel="stylesheet" href="shared/hub.css" />
     <script src="shared/games.js" defer></script>
     <script src="shared/app.js" data-root="./" defer></script>
+    <script src="shared/share.js" defer></script>
     <script src="shared/hub.js" defer></script>
   </head>
   <body class="hub">
@@ -45,5 +46,11 @@
       <button type="button" class="btn btn--ghost" id="install-btn" data-icon="download" hidden>ติดตั้งลงเครื่อง</button>
       <span class="hub__ver" id="ver"></span>
     </footer>
+
+    <!-- ส่งลิงก์ให้เพื่อน: แสดงเสมอ (ติดตั้งเป็นแอปแล้วไม่มีแถบที่อยู่ให้คัดลอก) · ลิงก์ตายตัวอยู่ใน shared/share.js -->
+    <div class="hub__share">
+      <button type="button" class="btn hub__share-btn" id="share-btn">📤 ส่งลิงก์ให้เพื่อน</button>
+      <p class="hub__share-note">ให้เพื่อนเปิดลิงก์ตอนมีเน็ตครั้งแรก แล้วเล่นออฟไลน์ได้เลย</p>
+    </div>
   </body>
 </html>

@@ -10,7 +10,8 @@ body.hub {
 
 .hub__head,
 .hub__main,
-.hub__foot {
+.hub__foot,
+.hub__share {
   width: 100%;
   max-width: 34rem;
   margin-inline: auto;
@@ -301,4 +302,42 @@ body.hub {
 .hub__ver {
   margin-left: auto;
   font-variant-numeric: tabular-nums;
+}
+
+/* ส่งลิงก์ให้เพื่อน — ล่างสุดของหน้า เห็นเสมอ ปุ่มใหญ่กดง่าย */
+.hub__share {
+  display: grid;
+  gap: var(--space-2xs);
+  padding: 0 0 var(--space-xl);
+  text-align: center;
+}
+
+.hub__share-btn {
+  width: 100%;
+  min-height: 52px;
+  border: 1.5px solid var(--color-accent);
+  background: var(--color-accent-wash);
+  color: var(--color-ink);
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+
+.hub__share-note {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--color-ink-3);
+}
+
+.share-box {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 var(--space-sm);
+  border: var(--rule-hair);
+  border-radius: var(--radius-md);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font: inherit;
+  font-size: var(--text-sm);
+  user-select: all;
+  -webkit-user-select: all;
 }
