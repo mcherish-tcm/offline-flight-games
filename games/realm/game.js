@@ -14,9 +14,9 @@
   var LEN_LABEL = { short: 'สั้น', mid: 'กลาง', long: 'ยาว' };
   var LEN_TIME = { short: '~20 นาที', mid: '~30 นาที', long: '~40 นาที' };
   var MODES = {
-    solo1: { label: '1 คน + คอม 1', short: 'คอม 1 ตัว', players: [{ name: 'คุณ' }, { name: 'คอมฟ้า', cpu: true }] },
-    solo2: { label: '1 คน + คอม 2', short: 'คอม 2 ตัว', players: [{ name: 'คุณ' }, { name: 'คอมฟ้า', cpu: true }, { name: 'คอมเขียว', cpu: true }] },
-    duo: { label: '2 คน + คอม 1', short: '2 คน + คอม', players: [{ name: 'แดง' }, { name: 'ฟ้า' }, { name: 'คอมเขียว', cpu: true }] }
+    solo1: { label: '1 คน + คอม 1', short: 'คอม 1 ตัว', short2: 'คอม\n1 ตัว', players: [{ name: 'คุณ' }, { name: 'คอมฟ้า', cpu: true }] },
+    solo2: { label: '1 คน + คอม 2', short: 'คอม 2 ตัว', short2: 'คอม\n2 ตัว', players: [{ name: 'คุณ' }, { name: 'คอมฟ้า', cpu: true }, { name: 'คอมเขียว', cpu: true }] },
+    duo: { label: '2 คน + คอม 1', short: '2 คน + คอม', short2: '2 คน\n+ คอม', players: [{ name: 'แดง' }, { name: 'ฟ้า' }, { name: 'คอมเขียว', cpu: true }] }
   };
 
   var playersEl = document.getElementById('players');
@@ -196,6 +196,12 @@
     schedule();
   }
 
+  // แถวตัวเลือกในหน้าเกมใหม่: ป้ายสองบรรทัด (ชื่อ / รายละเอียด) เว้นช่องไฟชัด — สไตล์อยู่ใน style.css (.rl-seg)
+  function rlSeg(node) {
+    node.classList.add('rl-seg');
+    return node;
+  }
+
   function setupSheet(canCancel) {
     var mode = opts.mode;
     var length = opts.length;
@@ -208,41 +214,47 @@
       mapNote.textContent = R.MAPS[map].blurb;
     }
     body.appendChild(
-      FG.choice(
-        R.MAP_IDS.map(function (k) {
-          return { value: k, label: R.MAPS[k].name };
-        }),
-        map,
-        function (v) {
-          map = v;
-          paintMapNote();
-        }
+      rlSeg(
+        FG.choice(
+          R.MAP_IDS.map(function (k) {
+            return { value: k, label: R.MAPS[k].name };
+          }),
+          map,
+          function (v) {
+            map = v;
+            paintMapNote();
+          }
+        )
       )
     );
     paintMapNote();
     body.appendChild(mapNote);
     body.appendChild(FG.label('ผู้เล่น: คุณเล่นกับคอม หรือ 2 คนบนเครื่องเดียว (+ คอม 1 ตัว)'));
     body.appendChild(
-      FG.choice(
-        Object.keys(MODES).map(function (k) {
-          return { value: k, label: MODES[k].short };
-        }),
-        mode,
-        function (v) {
-          mode = v;
-        }
+      rlSeg(
+        FG.choice(
+          Object.keys(MODES).map(function (k) {
+            return { value: k, label: MODES[k].short2 };
+          }),
+          mode,
+          function (v) {
+            mode = v;
+          }
+        )
       )
     );
     body.appendChild(FG.label('ความยาวเกม'));
     body.appendChild(
-      FG.choice(
-        ['short', 'mid', 'long'].map(function (k) {
-          return { value: k, label: LEN_LABEL[k] + ' ' + R.LENGTHS[k] + ' รอบ' };
-        }),
-        length,
-        function (v) {
-          length = v;
-        }
+      rlSeg(
+        FG.choice(
+          ['short', 'mid', 'long'].map(function (k) {
+            return { value: k, label: LEN_LABEL[k] + '\n' + R.LENGTHS[k] + ' รอบ' };
+          }),
+          length,
+          function (v) {
+            length = v;
+          }
+        )
       )
     );
     var note = document.createElement('p');

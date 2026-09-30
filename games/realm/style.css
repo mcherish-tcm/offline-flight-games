@@ -447,6 +447,26 @@
   color: var(--color-ink-2);
 }
 
+/* แถวตัวเลือกหน้าเกมใหม่ (FG.choice + .rl-seg): เว้นช่องไฟชัด · ป้ายขึ้นบรรทัดใหม่ได้ (\n) · ปุ่มสูงเท่ากัน ไม่ตัดคำ */
+.rl-seg {
+  gap: var(--space-xs);
+  margin-top: var(--space-2xs);
+}
+
+.rl-seg button {
+  min-height: 52px;
+  padding: var(--space-2xs) var(--space-xs);
+  font-size: var(--text-sm);
+  line-height: 1.25;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  background: var(--color-paper-2);
+}
+
+.rl-seg button[aria-checked="true"] {
+  background: var(--color-paper);
+}
+
 .rl-ov__actions {
   display: grid;
   grid-auto-flow: column;
