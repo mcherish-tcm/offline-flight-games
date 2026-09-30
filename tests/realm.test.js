@@ -1519,7 +1519,8 @@ test('ไม่จำกัดรอบ: คนแรกถึง Lv 6 = กา�
   assert.deepStrictEqual(s.deck, [0, 1, 2], 'กองไพ่ปกติไม่ถูกแตะ');
   assert.strictEqual(s.boss.stage, 'out');
   assert.ok(kinds(e3).indexOf('boss') !== -1);
-  // ใบถัดไป = ไพ่ปกติจากกอง
+  // ใบถัดไป = ไพ่ปกติจากกอง (ย้ายบอสไปเมือง 4 ช่อง 12 ให้พ้นทาง — v10.1 บอสขวางทางที่ช่อง 2 ได้)
+  s.boss.town = 4;
   s.turn = 0;
   s.phase = 'roll';
   var e4 = moveTo(s, 0, 4);
@@ -1651,6 +1652,108 @@ test('สู้บอส: บอสพลังชีวิตเต็มทุ
   assert.strictEqual(s.battle.hp, R.BOSS.hp);
   assert.strictEqual(s.boss.tries, 2);
   assert.strictEqual(s.players[0].st.bossTry, 2);
+});
+
+/* ---------- v10.1: บอสขวางทาง + ค่าบอสใหม่ ---------- */
+
+test('v10.1 ค่าบอส: พลังชีวิต 120 · โจมตี 26 · ป้องกัน 8 · คอมนิสัยปกติยอมสู้เมื่อโอกาส ≥ 0.15', function () {
+  assert.strictEqual(R.BOSS.hp, 120);
+  assert.strictEqual(R.BOSS.atk, 26);
+  assert.strictEqual(R.BOSS.def, 8);
+  assert.strictEqual(R.BOSS_TUNE.need, 0.15);
+  var f = R.bossFoe();
+  assert.strictEqual(f.hp, 120);
+  assert.strictEqual(f.boss, true);
+});
+
+test('บอสขวางทาง: เดินผ่านเมืองบอส = หยุดตรงนั้น ก้าวที่เหลือหาย · ถามสู้/ไม่สู้เหมือนหยุดพอดี', function () {
+  var s = bossAt(2, 3, 1); // เมือง 3 = ช่อง 10
+  s.players[1].pos = 20;
+  s.players[0].pos = 8;
+  var evs = R.act(s, { type: 'roll', forced: 5 }); // จะไปช่อง 13 แต่ติดบอสที่ช่อง 10
+  assert.strictEqual(s.players[0].pos, 10);
+  var mv = evs.filter(function (e) {
+    return e.k === 'move';
+  })[0];
+  assert.strictEqual(mv.steps, 2, 'แอนิเมชันเดินแค่ 2 ช่อง');
+  var bl = evs.filter(function (e) {
+    return e.k === 'boss-block';
+  })[0];
+  assert.ok(bl, 'ต้องมีเหตุการณ์บอสขวางทาง');
+  assert.strictEqual(bl.lost, 3);
+  assert.strictEqual(bl.town, 3);
+  assert.strictEqual(s.phase, 'decide');
+  assert.strictEqual(s.pending.kind, 'boss');
+  // หยุดพอดีที่เมืองบอส = ไม่มีเหตุการณ์ขวางทาง (แค่ถาม)
+  var t = bossAt(2, 3, 1);
+  t.players[1].pos = 20;
+  t.players[0].pos = 8;
+  var e2 = R.act(t, { type: 'roll', forced: 2 });
+  assert.strictEqual(count(kinds(e2), 'boss-block'), 0);
+  assert.strictEqual(t.pending.kind, 'boss');
+});
+
+test('บอสขวางทาง: ไม่สู้ = ยืนอยู่ที่เมืองบอส จบตา (ไม่เดินต่อ) · สู้ = สู้บอสตามปกติ', function () {
+  var s = bossAt(2, 3, 1);
+  s.players[1].pos = 20;
+  s.players[0].pos = 8;
+  var g0 = s.players[0].gold;
+  R.act(s, { type: 'roll', forced: 6 });
+  R.act(s, { type: 'skip' });
+  assert.strictEqual(s.players[0].pos, 10, 'ยังยืนที่เมืองบอส');
+  assert.strictEqual(s.players[0].gold, g0, 'ไม่เสียอะไร');
+  assert.strictEqual(s.turn, 1);
+  var t = bossAt(2, 3, 1);
+  t.players[1].pos = 20;
+  t.players[0].pos = 9;
+  R.act(t, { type: 'roll', forced: 4 });
+  R.act(t, { type: 'fight' });
+  assert.strictEqual(t.phase, 'battle');
+  assert.strictEqual(t.battle.boss, true);
+});
+
+test('บอสขวางทางก่อนถึงลานประตูเมือง = ไม่ได้เงินหลวง (ยังไม่ได้ผ่านลาน) · ประลองช่องเดียวกันยังเกิดก่อน', function () {
+  var s = bossAt(2, 9, 1); // เมือง 9 = ช่อง 26
+  s.players[1].pos = 5;
+  s.players[0].pos = 24;
+  var g0 = s.players[0].gold;
+  var evs = R.act(s, { type: 'roll', forced: 6 }); // จะผ่านลานไปช่อง 0
+  assert.strictEqual(s.players[0].pos, 26);
+  assert.strictEqual(count(kinds(evs), 'salary'), 0);
+  assert.strictEqual(s.players[0].gold, g0);
+  assert.strictEqual(s.pending.kind, 'boss');
+  // มีผู้เล่นอื่นยืนที่เมืองบอส = ถามประลองก่อน แล้วค่อยเจอบอส
+  var d = bossAt(2, 3, 1);
+  d.players[1].pos = 10;
+  d.players[1].gold = 10; // กันคอมท้า
+  d.players[0].pos = 8;
+  R.act(d, { type: 'roll', forced: 5 });
+  assert.strictEqual(d.pending.kind, 'duel-offer');
+  R.act(d, { type: 'skip' });
+  assert.strictEqual(d.pending.kind, 'boss');
+});
+
+test('บอสขวางทาง: ไพ่ลมส่งท้ายเรือ (เดิน 3 ช่อง) ถูกขวาง · ไพ่ทางลัด (วาร์ป) ไม่ถูกขวาง ได้เงินหลวงตามเดิม', function () {
+  var idx = function (id) {
+    return R.CARDS.map(function (c) {
+      return c.id;
+    }).indexOf(id);
+  };
+  var s = bossAt(2, 5, 1); // เมือง 5 = ช่อง 16
+  s.players[1].pos = 5;
+  s.deck = [idx('wind')];
+  s.players[0].pos = 11;
+  R.act(s, { type: 'roll', forced: 3 }); // 11 → 14 (ผ่าน 12 เมือง 4 ไม่มีบอส) เปิดไพ่ลม +3 → ติดบอสช่อง 16
+  assert.strictEqual(s.players[0].pos, 16);
+  assert.strictEqual(s.pending.kind, 'boss');
+  var g = bossAt(2, 9, 1); // เมือง 9 = ช่อง 26
+  g.players[1].pos = 5;
+  g.players[0].pos = 20;
+  g.deck = [idx('gate')];
+  var evs = R.act(g, { type: 'roll', forced: 3 }); // 20 → ศาลาช่อง 23 → ทางลัดวาร์ปไปลาน ผ่านช่อง 26
+  assert.strictEqual(g.players[0].pos, 0);
+  assert.ok(kinds(evs).indexOf('salary') !== -1);
+  assert.strictEqual(count(kinds(evs), 'boss-block'), 0);
 });
 
 test('ปราบบอส = จบเกมทันที · คนปราบอันดับ 1 (แม้จนสุด) · ที่เหลือเรียงตามทรัพย์รวม', function () {
