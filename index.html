@@ -32,14 +32,10 @@
     </header>
 
     <main class="hub__main">
-      <section class="shelf" aria-labelledby="solo-h">
-        <h2 class="shelf__title" id="solo-h">เล่นคนเดียว</h2>
-        <ul class="shelf__list" id="solo-list"></ul>
-      </section>
-
-      <section class="shelf" aria-labelledby="duo-h">
-        <h2 class="shelf__title" id="duo-h">เล่น 2 คน หรือกับคอม</h2>
-        <ul class="shelf__list" id="duo-list"></ul>
+      <div class="tabs" id="tabs" role="tablist" aria-label="เลือกแบบการเล่น"></div>
+      <section class="shelf" id="shelf" role="tabpanel">
+        <p class="shelf__hint" id="tab-hint"></p>
+        <ul class="shelf__list" id="game-list"></ul>
       </section>
     </main>
 

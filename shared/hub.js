@@ -3,6 +3,8 @@
   'use strict';
 
   var GLYPHS = {
+    realm:
+      '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M4 30V15h4v3h3v-3h4v15z"/><path d="M8 30v-5a1.5 1.5 0 0 1 3 0v5"/><path d="M4 30h26"/><path class="fg-accent-line" d="M29 4l-9.5 9.5M17.5 11.5l4 4M18 15l-2 2M21.5 18.5l-2-2" stroke-width="2.2"/><circle class="fg-accent" cx="26" cy="21" r="3" stroke-width="0"/></svg>',
     '2048':
       '<svg viewBox="0 0 34 34" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="12" height="12" rx="3"/><rect class="fg-accent" x="19" y="3" width="12" height="12" rx="3"/><rect x="3" y="19" width="12" height="12" rx="3"/><rect x="19" y="19" width="12" height="12" rx="3"/></svg>',
     sudoku:
@@ -82,15 +84,55 @@
     return li;
   }
 
-  function renderLists() {
-    var solo = document.getElementById('solo-list');
-    var duo = document.getElementById('duo-list');
-    solo.innerHTML = '';
-    duo.innerHTML = '';
-    FG_GAMES.forEach(function (g) {
-      (g.players === 2 ? duo : solo).appendChild(row(g));
+  /* ---------- แท็บ เล่นคนเดียว / เล่น 2 คน (จำแท็บล่าสุดไว้) ----------
+   * รายการของแต่ละแท็บ + การเรียงตามชื่อไทย มาจาก FG_GAMES_FOR ใน shared/games.js (เทสใช้ตัวเดียวกัน) */
+  var TAB_KEY = 'hubtab';
+  var tabsEl = document.getElementById('tabs');
+  var listEl = document.getElementById('game-list');
+  var hintEl = document.getElementById('tab-hint');
+  var shelfEl = document.getElementById('shelf');
+  var tab = FG.store.get(TAB_KEY, 'solo');
+  if (!FG_TABS.some(function (t) { return t.id === tab; })) tab = 'solo';
+
+  FG_TABS.forEach(function (t) {
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.id = 'tab-' + t.id;
+    b.setAttribute('role', 'tab');
+    b.setAttribute('aria-controls', 'shelf');
+    b.setAttribute('data-tab', t.id);
+    b.innerHTML = '<span>' + t.label + '</span><span class="tabs__n num">' + FG_GAMES_FOR(t.id).length + '</span>';
+    b.addEventListener('click', function () {
+      if (tab === t.id) return;
+      tab = t.id;
+      FG.store.set(TAB_KEY, tab);
+      renderLists();
+      window.scrollTo(0, 0);
     });
-    if (!duo.children.length) duo.appendChild(soon());
+    tabsEl.appendChild(b);
+  });
+
+  tabsEl.addEventListener('keydown', function (e) {
+    if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+    var i = FG_TABS.findIndex(function (t) { return t.id === tab; });
+    var n = FG_TABS[(i + (e.key === 'ArrowRight' ? 1 : FG_TABS.length - 1)) % FG_TABS.length];
+    document.getElementById('tab-' + n.id).click();
+    document.getElementById('tab-' + n.id).focus();
+  });
+
+  function renderLists() {
+    tabsEl.querySelectorAll('[role="tab"]').forEach(function (b) {
+      var on = b.getAttribute('data-tab') === tab;
+      b.setAttribute('aria-selected', String(on));
+      b.tabIndex = on ? 0 : -1;
+    });
+    shelfEl.setAttribute('aria-labelledby', 'tab-' + tab);
+    hintEl.textContent = FG_TABS.filter(function (t) { return t.id === tab; })[0].hint;
+    listEl.innerHTML = '';
+    FG_GAMES_FOR(tab).forEach(function (g) {
+      listEl.appendChild(row(g));
+    });
+    if (!listEl.children.length) listEl.appendChild(soon());
   }
 
   /* ---------- offline readiness ---------- */

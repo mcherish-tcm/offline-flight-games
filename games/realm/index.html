@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#0f1622" />
+    <title>ชิงเมืองแดนมนตร์ · เกมบนเครื่องบิน</title>
+    <link rel="manifest" href="../../manifest.webmanifest" />
+    <link rel="icon" href="../../icons/icon.svg" type="image/svg+xml" />
+    <script>
+      try {
+        if (localStorage.getItem('ffg:theme') === '"light"') document.documentElement.setAttribute('data-theme', 'light');
+      } catch (e) {}
+    </script>
+    <link rel="stylesheet" href="../../shared/tokens.css" />
+    <link rel="stylesheet" href="../../shared/base.css" />
+    <link rel="stylesheet" href="style.css" />
+    <script src="../../shared/games.js" defer></script>
+    <script src="../../shared/app.js" data-root="../../" defer></script>
+    <script src="engine.js" defer></script>
+    <script src="game.js" defer></script>
+  </head>
+  <body class="game">
+    <header class="bar">
+      <a class="bar__back" href="../../" data-icon="back">หน้าแรก</a>
+      <h1 class="bar__title">ชิงเมืองแดนมนตร์</h1>
+      <div class="bar__actions">
+        <button type="button" class="icon-btn" data-howto="realm" data-icon="info" aria-label="วิธีเล่น"></button>
+        <button type="button" class="icon-btn" id="restart" data-icon="restart" aria-label="เกมใหม่"></button>
+      </div>
+    </header>
+    <main class="stage rl" id="stage">
+      <div class="rl-players" id="players" aria-label="ผู้เล่น"></div>
+      <div class="rl-wrap" id="wrap">
+        <div class="rl-board" id="board">
+          <div class="rl-center" id="center">
+            <div class="rl-round num" id="round"></div>
+            <div class="rl-die num" id="die" aria-live="polite"></div>
+            <ol class="rl-log" id="log" aria-live="polite"></ol>
+          </div>
+        </div>
+      </div>
+      <div class="rl-panel" id="panel">
+        <p class="rl-msg" id="msg"></p>
+        <div class="rl-actions" id="actions"></div>
+      </div>
+    </main>
+
+    <!-- หน้าต่างเต็มจอ: ต่อสู้ · ประลอง · ร้านค้า · ลงทุน · ผลจบเกม -->
+    <div class="rl-ov" id="ov" hidden>
+      <div class="rl-ov__box" id="ov-box"></div>
+    </div>
+
+    <!-- จอบัง: ส่งเครื่องให้ผู้เล่นอีกคน (โหมด 2 คน) -->
+    <div class="rl-cover" id="cover" hidden>
+      <div class="rl-cover__box">
+        <span class="rl-cover__chip" aria-hidden="true"></span>
+        <p class="rl-cover__title" id="cover-title"></p>
+        <p class="rl-cover__text" id="cover-text"></p>
+        <button type="button" class="btn btn--primary rl-cover__go" id="cover-go">แตะเมื่อพร้อม</button>
+      </div>
+    </div>
+  </body>
+</html>
