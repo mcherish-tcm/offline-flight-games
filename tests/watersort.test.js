@@ -213,6 +213,22 @@ test('levels 1..' + LEVELS + ' solvable: solve() + replay with pour() ends solve
 });
 var solveMs = Date.now() - solveStart;
 
+// บั๊กด่าน 22 (13 Nov 2026): กดคำใบ้ซ้ำ ๆ แล้ววนเท 2 หลอดไปมาไม่จบ
+test('following hint() repeatedly solves levels 1..150 with no repeated state', function () {
+  for (var n = 1; n <= 150; n++) {
+    var cur = lv(n).tubes;
+    var seen = {};
+    for (var i = 0; !W.isSolved(cur); i++) {
+      var key = JSON.stringify(cur);
+      assert.ok(!seen[key], 'level ' + n + ' hint loops at move ' + i);
+      seen[key] = true;
+      var h = W.hint(cur);
+      assert.ok(h && W.canPour(cur, h[0], h[1]), 'level ' + n + ' hint missing/illegal at move ' + i);
+      cur = W.pour(cur, h[0], h[1]).tubes;
+    }
+  }
+});
+
 test('timing: generating levels 1..' + LEVELS + ' under 5 s', function () {
   assert.ok(genMs < 5000, 'took ' + genMs + ' ms');
 });

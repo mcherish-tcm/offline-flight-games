@@ -216,10 +216,27 @@
 
   // ตาแนะนำสำหรับปุ่มคำใบ้ · null = เสร็จแล้ว หรือหาทางไม่เจอ (ผู้เล่นอาจเดินจนตัน → ให้ UI แนะนำเริ่มใหม่/ย้อน)
   // เพดานโหนดต่ำกว่า solve() ปกติ เพื่อไม่ให้มือถือค้างนานเมื่อสถานะตันจริง
+  // 🔴 จำแผนเต็มไว้ (สถานะเป๊ะตามลำดับหลอด → ตาถัดไป) แล้วเดินตามแผนเดิม — ห้ามแก้ใหม่ทุกครั้ง
+  //    เพราะ DFS แต่ละรอบให้แผนคนละเส้น ตาแรกของแผนใหม่อาจย้อนตาที่เพิ่งเท → คำใบ้วนเท 2 หลอดไปมา (บั๊กด่าน 22)
+  var planNext = {};
+
+  function exactKey(tubes) {
+    return JSON.stringify(tubes);
+  }
+
   function hint(tubes, opts) {
     if (isSolved(tubes)) return null;
+    var k = exactKey(tubes);
+    if (planNext[k]) return planNext[k].slice();
     var sol = solve(tubes, { limit: (opts && opts.limit) || 50000 });
-    return sol && sol.length ? sol[0] : null;
+    if (!sol || !sol.length) return null;
+    planNext = {};
+    var s = tubes;
+    for (var i = 0; i < sol.length; i++) {
+      planNext[exactKey(s)] = sol[i];
+      s = pour(s, sol[i][0], sol[i][1]).tubes;
+    }
+    return sol[0].slice();
   }
 
   // ---------- ตัวสร้างด่าน ----------
